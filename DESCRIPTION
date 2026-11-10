@@ -2,7 +2,7 @@ Package: arraydesign
 Title: Acoustic Receiver Array Design and Track Simulation
 Version: 0.1.1
 Authors@R:
-    person("Jacob", "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
+    person(c("Jacob", "W."), "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0003-2496-8764"))
 Description: Places acoustic receivers on a depth raster, simulates animal
     tracks as a correlated random walk that stays in water, simulates tag

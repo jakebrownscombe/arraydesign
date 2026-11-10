@@ -75,12 +75,6 @@ plot(field) +
 *Probability that at least one of the 20 receivers hears one
 transmission from each 100 m water cell of Stoney Lake.*
 
-The message from `de_field()` counts the receiver and cell pairs with
-`p >= 0.05` that have land on the straight line between them. A curve
-from `de_logistic()` reads a pair with land on the line at the distance
-through water; `blocked` in `?detfield::de_model` sets how much less
-such pairs hear.
-
 ## Articles
 
 - [Design and test an array for Stoney
@@ -121,10 +115,11 @@ diagram below shows.
 
 ## Cite
 
-Brownscombe J (2026). *positionR: tools for acoustic telemetry studies*.
-R package version 2.0.0, <https://jakebrownscombe.github.io/positionR/>.
+Brownscombe JW (2026). *positionR: tools for acoustic telemetry
+studies*. R package version 2.0.0,
+<https://jakebrownscombe.github.io/positionR/>.
 
-Brownscombe J (2026). *arraydesign: Acoustic Receiver Array Design and
+Brownscombe JW (2026). *arraydesign: Acoustic Receiver Array Design and
 Track Simulation*. R package version 0.1.1,
 <https://jakebrownscombe.github.io/arraydesign/>.
 

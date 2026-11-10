@@ -24,9 +24,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
 ```
 
 An array is scored on simulated animals, and the way they move changes the score. Figure 1 shows
-one simulated animal under each of the five movement models of this page. Each section shows the
-code that builds its model; sections 1, 2, 4 and 5 also walk its tracks, and the tracks of
-section 3's model are walked in section 6.
+one simulated animal under each of the five movement models of this page.
 
 ```{r opening-one-animal-per-model, echo = FALSE, purl = FALSE, message = FALSE, fig.height = 5, fig.alt = "Five maps of parts of Stoney Lake, one simulated track each: a random walk wandering from the middle of the lake, a moving and resting track with squares where it rested, a track of resampled steps, a track running from the south-west arm to a goal on the north shore, and a track tangled over the deep north-east basin."}
 # Run the code of sections 1 to 6 to draw Figure 1 first; the code is
@@ -127,7 +125,7 @@ This page sets the movement in five ways:
 - a preference for a habitat layer, such as bottom depth, of a strength you set.
 
 Each gives a movement model to pass to `simulate_tracks()` and `evaluate_array()`. Section 6
-measures how much the choice changes an array's score. Its code installs as
+measures how much the choice changes an array's score. This page's code is included as
 `movement-models.R` in `system.file("scripts", package = "arraydesign")`.
 
 Stoney Lake, Ontario, at 100 m resolution, is the example water body, as in
@@ -206,9 +204,7 @@ step_draws <- walk$step(10000)
 summary(step_draws)
 ```
 
-The draws have a mean of `r sprintf("%.1f", mean(step_draws))` m and a median of
-`r sprintf("%.1f", median(step_draws))` m; the long right tail of the gamma gives the odd step of
-over `r floor(max(step_draws) / 50) * 50` m. These are starting values; no species was measured to set them. The next chunk releases five
+These are starting values; no species was measured to set them. The next chunk releases five
 animals together in the middle of the lake under three turning spreads: 10 degrees, 40 degrees
 and uniform turns. `track_control(start = ...)` sets the release point; section 4 shows its other
 settings.
@@ -259,15 +255,13 @@ depth_map(zoom = list(x = c(724500, 731500), y = c(4934800, 4939800))) +
         legend.box = "horizontal")
 ```
 
-*Figure 2. Tracks of five simulated animals over 4 hours (240 steps of 60 s) released
-together at one point (circle) in the middle of Stoney Lake, under a correlated random walk with
-gamma steps of mean 30 m and standard deviation 15 m per minute and a turning-angle standard
-deviation of (a) 10 degrees, (b) 40 degrees and (c) uniform turns.*
+*Figure 2. Tracks of five simulated animals over 4 hours, released together at one point
+(circle) in the middle of Stoney Lake, under a correlated random walk with a turning-angle
+standard deviation of (a) 10 degrees, (b) 40 degrees and (c) uniform turns.*
 
 `attr(tracks, "escapes")` counts, per animal, the steps taken as drawn, reflected at the shore,
 held in place, and still. A model whose steps are too long for the water body, or in the wrong units,
-gives many reflections. `simulate_tracks()` warns when more than half of the moving steps were
-reflected. Here are the counts of the run with uniform turns:
+gives many reflections. Here are the counts of the run with uniform turns:
 
 ```{r count-shore-reflections}
 # Count the steps per animal: as drawn, reflected, held and still
@@ -279,16 +273,14 @@ attr(turn_tracks$uniform, "escapes")
 Many animals alternate between moving and resting. `movement_model()` takes any pair of
 samplers. With `states = 2` and a 2 by 2 transition matrix, the animal switches between moving
 with the samplers (state 1) and staying in place (state 2). Rows are the state
-at one step and columns the state at the next, so row 1 holds the probabilities of moving and of
-resting after a moving step, and row 2 the same after a resting step; each row sums to 1. A
-state kept with probability `p` (the diagonal) lasts a mean of `1 / (1 - p)` steps, which the
-model prints.
+at one step and columns the state at the next; each row sums to 1. A state kept with
+probability `p` lasts a mean of `1 / (1 - p)` steps, which the model prints.
 
 A hidden Markov model fitted with the **moveHMM** or **momentuHMM** R package can have gamma step lengths and
 wrapped Cauchy turning angles in its moving state. The wrapped Cauchy needs no extra package: a
 Cauchy draw with scale `-log(rho)`, wrapped to the circle, has concentration `rho`. The values
-below are illustrative values that no fit produced. Use the estimates of your own fit, in metres
-per time step of that fit. The first chunk writes the two samplers.
+below are illustrative; use the estimates of your own fit, in metres per time step of that fit.
+The first chunk writes the two samplers.
 
 ```{r two-state-samplers}
 # Set the moving-state estimates: mean and sd of step length (m per 60 s)
@@ -376,10 +368,8 @@ depth_map(zoom = list(x = range(two_state$x) + c(-800, 800),
                                                    shape = c(NA, 15))))
 ```
 
-*Figure 3. Track of one simulated animal over 8 hours (480 steps of 60 s) from its start
-(circle) under the two-state model: moving with gamma steps of mean 25 m per minute and
-wrapped Cauchy turns (concentration 0.6) for a mean of 20 steps, then resting for a mean of 10
-steps.*
+*Figure 3. Track of one simulated animal over 8 hours from its start (circle) under the
+two-state model, moving for a mean of 20 steps, then resting for a mean of 10.*
 
 ## 3. A sampler of your own
 
@@ -402,9 +392,9 @@ own_model <- movement_model(
 own_model
 ```
 
-`movement_model()` draws five values from each function before it returns. A sampler that gives
-the wrong number of values, or a negative step, therefore stops it at once. A common error is to
-draw one value where `n_draws` are needed:
+`movement_model()` tests each sampler before it returns, and stops on one that gives the wrong
+number of values or a negative step. A common error is to draw one value where `n_draws` are
+needed:
 
 ```{r sampler-error}
 # Try a step sampler that ignores n_draws and draws one value
@@ -554,23 +544,22 @@ goal_map <- depth_map(zoom = list(x = c(720300, 729500),
 goal_map
 ```
 
-*Figure 4. Tracks of ten simulated animals over up to 24 hours (1,440 steps of 60 s), released
-together (circle) in the south-west arm of Stoney Lake under the correlated random walk of
-section 1 and pulled towards a goal in a bay on the north shore (diamond; dashed circle:
-the 300 m arrival distance).*
+*Figure 4. Tracks of ten simulated animals over up to 24 hours, released together (circle) in
+the south-west arm of Stoney Lake and pulled towards a goal in a bay on the north shore
+(diamond; dashed circle: the 300 m arrival distance).*
 
-A goal must lie in water that every start can reach through cells that share an edge;
-`simulate_tracks()` stops otherwise. `evaluate_array()` releases its animals at random water
-cells with no goal, and takes the start time as `control = list(start_time = ...)`.
+A goal must lie in water that every start can reach. `evaluate_array()` releases its animals at
+random water cells with no goal, and takes the start time as
+`control = list(start_time = ...)`.
 
 ## 5. A preference for a habitat layer
 
 `habitat_selection()` gives a movement model a preference for the values of a raster layer.
 Each step is drawn from the walk of section 1 and kept with probability proportional to
-`exp(beta * layer)` at its end; a step not kept is drawn again. The animals therefore select the
-layer with a strength `beta` per unit at the scale of one step, known exactly, and a simulated
-study becomes a test of whether a habitat analysis recovers a preference that is known. Here the
-layer is bottom depth, and `beta = -0.3` per m favours shallow water.
+`exp(beta * layer)` at its end; a step not kept is drawn again. The animals select the layer
+with a known strength, `beta` per unit at the scale of one step, so a simulated study can test
+whether a habitat analysis recovers it. Here the layer is bottom depth, and `beta = -0.3` per m
+favours shallow water.
 
 ```{r depth-preference}
 # Make a layer of bottom depth in positive metres, named for the analysis
@@ -601,8 +590,7 @@ shallow_tracks
 ```
 
 The next chunk walks five of these animals, the first five released in the eastern part of the
-lake (east of 727,000 m and north of 4,935,600 m: the north-east basin and the east of the
-central lake), under three preferences: for shallow water, none, and for deep water (`beta = 0.3`). It prints
+lake, under three preferences: for shallow water, none, and for deep water (`beta = 0.3`). It prints
 the median bottom depth of each run's positions.
 
 ```{r walk-three-preferences}
@@ -669,11 +657,9 @@ depth_map(zoom = basin) +
         legend.box = "horizontal")
 ```
 
-*Figure 5. Tracks of five simulated animals over 48 hours (2,880 steps of 60 s)
-from the same five release points (circles) in the eastern part of Stoney Lake, the
-north-east basin and the east of the central lake, under
-the correlated random walk of section 1 with a preference for bottom depth of (a) -0.3 per m,
-(b) none and (c) 0.3 per m. Tracks that leave the basin are cut at the edge of the map.*
+*Figure 5. Tracks of five simulated animals over 48 hours from the same five release points
+(circles) in the eastern part of Stoney Lake, with a preference for bottom depth of (a) -0.3
+per m, (b) none and (c) 0.3 per m.*
 
 `available_steps()` checks the truth on the tracks themselves. For each step an animal took it
 draws 10 control steps from the same walk, from the same start and heading, and reads the depth
@@ -724,7 +710,7 @@ covered
 The 20 animals give a mean of `r sprintf("%.3f", mean_estimate)` per m (95% interval
 `r sprintf("%.3f", mean_estimate - half_width)` to `r sprintf("%.3f", mean_estimate + half_width)`)
 against the -0.3 of the model, and the intervals of `r covered` of 20 animals hold -0.3. The
-coefficient holds at the scale of one step. A fit to positions an hour apart compares places
+coefficient applies at the scale of one step. A fit to positions an hour apart compares places
 farther apart, so it need not return the same number; test it against a fit to the true track at
 that scale.
 
@@ -808,10 +794,8 @@ ggplot(rates, aes(movement, rate)) +
 ```
 
 *Figure 6. Share of transmissions heard by at least one receiver of the 20-receiver grid
-for each of 20 simulated animals over 6 hours, under four movement models: a slow correlated
-random walk of 6 m a minute, the walk of 30 m a minute of section 1, the two-state model of
-section 2, and the resampled example steps of section 3. Bars mark the mean across animals. All
-four runs release the animals at the same 20 points.*
+for each of 20 simulated animals over 6 hours, under four movement models. Bars mark the mean
+across animals. All four runs release the animals at the same 20 points.*
 
 The hit rate is
 `r sprintf("%.3f", by_model$hit_rate[by_model$movement == "crw"])` for the walk of 30 m a

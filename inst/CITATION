@@ -1,6 +1,6 @@
 # The positionR citation comes first in every package of the suite, then the
 # package's own.
-author <- person("Jacob", "Brownscombe", email = "jakebrownscombe@gmail.com",
+author <- person(c("Jacob", "W."), "Brownscombe", email = "jakebrownscombe@gmail.com",
                  comment = c(ORCID = "0000-0003-2496-8764"))
 
 bibentry(
@@ -11,7 +11,7 @@ bibentry(
   note = "R package version 2.0.0",
   url = "https://jakebrownscombe.github.io/positionR/",
   textVersion = paste0(
-    "Brownscombe J (2026). positionR: tools for acoustic telemetry studies. ",
+    "Brownscombe JW (2026). positionR: tools for acoustic telemetry studies. ",
     "R package version 2.0.0, https://jakebrownscombe.github.io/positionR/."
   )
 )
@@ -24,7 +24,7 @@ bibentry(
   note = paste("R package version", meta$Version),
   url = "https://jakebrownscombe.github.io/arraydesign/",
   textVersion = paste0(
-    "Brownscombe J (2026). arraydesign: ", meta$Title, ". ",
+    "Brownscombe JW (2026). arraydesign: ", meta$Title, ". ",
     "R package version ", meta$Version, ", https://jakebrownscombe.github.io/arraydesign/."
   )
 )

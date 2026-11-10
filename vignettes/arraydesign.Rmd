@@ -40,10 +40,8 @@ between moving and resting, and a goal-oriented model with start and end points.
 
 ## 1. Place receivers on Stoney Lake
 
-The depth raster is Stoney Lake at 100 m resolution, with land as `NA`. Depth is zero or
-negative metres; 56 of its 4,818 water cells hold 0. It has the same grid and depths as
-`depth_raster` of positionR 1.7.0, with the CRS set to EPSG:32617. `terra::rast()` reads it;
-the print gives its extent, resolution and depth range.
+The depth raster is Stoney Lake at 100 m resolution, with land as `NA` and depth as zero or
+negative metres.
 
 ```{r read-lake}
 # Load the package, and ggplot2 for the maps
@@ -91,9 +89,9 @@ distance and receiver depth. The
 [**detfield**](https://jakebrownscombe.github.io/detfield/) R package, which builds detection
 fields and positions animals, sets it in one of two ways. `detfield::de_model()` wraps a model
 you fitted to your own range-test data, and `detfield::de_logistic()` makes a stand-in curve
-from two distances for a study with no range test; neither estimates a model from range-test
-data for you. The example uses the stand-in and assumes all of its values: no range test
-measured them, and the range test included with **detfield** is simulated from them. It takes the distances at which 50% and 5% of transmissions are heard (`d50`, `d05`) to be 250 m and 500 m
+from two distances for a study with no range test. The example uses the stand-in with assumed
+values; no range test measured them. It takes the distances at which 50% and 5% of
+transmissions are heard (`d50`, `d05`) to be 250 m and 500 m
 for a receiver 1 m deep and 750 m and 1,500 m at 35 m, interpolated between. [Design an array
 for your own water body](design-an-array.html#the-range-model-yours-or-the-default) takes a
 model fitted to your own range test.
@@ -116,11 +114,6 @@ distances <- detfield::water_distances(lake, receivers)
 # Read the curve at each distance: one probability per receiver and cell
 field <- detfield::de_field(distances, range_model)
 ```
-
-The message from `de_field()` counts the receiver and cell pairs with `p >= 0.05` that have land
-on the straight line between them. A curve from `de_logistic()` reads a pair with land on the
-line at the distance through water; `blocked` in `?detfield::de_model` sets how much less
-such pairs hear.
 
 `coverage_summary()` counts, at each threshold, the cells that at least one receiver hears on its
 own (`n_cells`).
@@ -197,9 +190,8 @@ positions the animals from what was heard. This is the reference run of the
 [**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/) R package, the
 point-and-click application of **arraydesign**: 20 animals for 6 hours.
 [Simulate and score an array step by step](simulate-detections.html) runs each of these stages
-on its own. The delay is a setting, the `tag_delay` element of `control`: its default is 65 to
-185 s, a tag programmed at 60 to 180 s with a 5 s transmission, and this page sets it to 120 to
-180 s. Give the delay of your own tags, one number or the shortest and longest, in seconds.
+on its own. Set `tag_delay` in `control` to the delay of your own tags, in seconds; the default
+is 65 to 185 s.
 
 ```{r evaluate}
 # Simulate 20 animals for 6 hours, detect, position and score them
@@ -223,10 +215,8 @@ c(mean = mean(rate_per_animal), median = median(rate_per_animal),
   never_heard = sum(rate_per_animal == 0))
 ```
 
-`r sum(sent$n_detections > 0)` transmissions were heard. The mean detection rate per animal is
-`r sprintf("%.1f%%", 100 * mean(rate_per_animal))`, and `r sum(rate_per_animal == 0)` of the 20
-animals were never heard. Counting the detections of each receiver separates the receivers
-that heard the animals from those that heard none.
+Counting the detections of each receiver separates the receivers that heard the animals from
+those that heard none.
 
 ```{r receiver-detections}
 # Count the detections of each receiver; a receiver that heard none counts 0
@@ -283,9 +273,8 @@ ggplot(tracks_table, aes(x, y)) +
   detfield::theme_positionr()
 ```
 
-*Tracks of the 20 simulated animals over 6 hours, from their starts, and their
-`r format(nrow(sent), big.mark = ",")` transmissions, heard by at least one receiver or not.
-Of the 20 receivers, `r sum(receiver_counts$detections > 0)`
+*Tracks of the 20 simulated animals over 6 hours and their
+`r format(nrow(sent), big.mark = ",")` transmissions. Of the 20 receivers, `r sum(receiver_counts$detections > 0)`
 heard at least one transmission and `r sum(receiver_counts$detections == 0)` heard none.*
 
 ## 5. Score positions
@@ -294,16 +283,11 @@ For each animal-hour with a detection, `evaluate_array()` counts the detections 
 with `detfield::bin_detections()`, computes a location surface with
 `detfield::location_surface()`, and measures the distance from the surface's mean to the
 animal's mean true position in the hour. The location surface is the positioning method of
-**detfield**: for one animal and one hour, the likelihood of each listening receiver's count of
-detections over the water cells, under a flat prior and normalised to sum to one; by default the
-binomial likelihood, which uses the detections and the misses (`?detfield::location_surface`;
-[the model](https://jakebrownscombe.github.io/detfield/articles/positioning.html)). A study may position its
-animals by another method from the same detection set; the
-[**detqc**](https://jakebrownscombe.github.io/detqc/) R package writes it in the forms the glatos
-and actel R packages and the trackyverse ATO read (`detqc::to_glatos()`, `detqc::to_actel()` and
-`detqc::to_ato()`). The hit rate is the mean,
-over animal-hours, of the share of the hour's true positions that fall inside the surface's 95%
-region.
+**detfield**: the probability that the animal was in each water cell in the hour, given each
+receiver's count of detections (`?detfield::location_surface`;
+[the model](https://jakebrownscombe.github.io/detfield/articles/positioning.html)). The hit rate
+is the mean, over animal-hours, of the share of the hour's true positions that fall inside the
+surface's 95% region.
 
 Only an animal-hour with a detection can be positioned with a location surface, here a share of
 `r sprintf("%.3f", evaluation$score$overall$scored_share)` of the

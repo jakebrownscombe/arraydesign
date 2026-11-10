@@ -24,8 +24,8 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
 ```
 
 `evaluate_array()` runs a whole simulation in one call. This page runs it one step at a time,
-from tracks to location surfaces and scores. It opens with where the chain ends: the location
-surface of one animal-hour (Figure 1), which section 6 builds step by step.
+from tracks to location surfaces and scores. Figure 1 is the location surface of one
+animal-hour, which section 6 builds step by step.
 
 ```{r opening-surface, echo = FALSE, purl = FALSE, message = FALSE, fig.height = 5.4, fig.alt = "Location surface of one animal-hour on Stoney Lake in magma colours over water drawn by depth, with its 95% region outlined, three yellow rings for the receivers that heard the animal, white rings for silent receivers, and the animal's true transmissions as green points and red crosses."}
 # Draw the map of section 6 as a preview from evaluate_array(); the code is
@@ -117,13 +117,7 @@ field <- detfield::de_field(detfield::water_distances(lake, receivers),
 field$key
 ```
 
-The message from `de_field()` counts the receiver and cell pairs with `p >= 0.05` that have land
-on the straight line between them. A curve from `de_logistic()` reads a pair with land on the
-line at the distance through water; `blocked` in `?detfield::de_model` sets how much less
-such pairs hear.
-
-The field is keyed by station, because the receivers have a `station_id`. Its `lookup` names
-the receiver at each station, which the detections take as `receiver_serial`.
+The field is keyed by station, because the receivers have a `station_id`.
 
 ## 1. Tracks
 
@@ -147,10 +141,8 @@ tracks
 
 ## 2. Transmissions
 
-Each animal's tag transmits with a random delay of 120 to 180 s from the start of one
-transmission to the start of the next, a mean of 24 an hour. The position of each transmission
-is interpolated along the step during which it was sent. The chunk returns one row per
-transmission.
+Each animal's tag transmits with a random delay of 120 to 180 s, a mean of 24 an hour. The
+chunk returns one row per transmission.
 
 ```{r simulate-transmissions}
 # Send a transmission every 120 to 180 s along each track
@@ -196,8 +188,7 @@ sum(rate == 0)
 
 These rates match
 [step 4 of Get started](arraydesign.html#simulate-animals-and-their-detections) and the app's
-Simulation tab, because `evaluate_array()` and the app draw the tracks, the transmissions and
-the detections in the same order. An animal-hour with no detection cannot be positioned; the
+Simulation tab. An animal-hour with no detection cannot be positioned; the
 next chunk counts those that have one.
 
 ```{r animal-hours-heard}
@@ -262,8 +253,7 @@ ggplot(water, aes(x, y)) +
 ```
 
 *Figure 2. Tracks and transmissions of the 20 simulated animals of the reference run over 6
-hours in the north-east basin of Stoney Lake, heard by some receiver or not, with the starts in
-view.*
+hours, in the north-east basin of Stoney Lake.*
 
 ## 4. Receivers that stop listening
 
@@ -287,9 +277,8 @@ deployments[recovered, c("station_id", "deploy_z", "deploy_datetime",
                          "recover_datetime")]
 ```
 
-This field is built from the deployment table, which records when each station listened. The
-same transmissions are simulated again under it, with the same seed, so the two runs differ
-only where the field differs.
+The same transmissions are simulated again under a field built from the deployments, with the
+same seed, so the two runs differ only where the field differs.
 
 ```{r receiver-recovered-early}
 # Build the field from the deployments, then simulate with the same
@@ -309,14 +298,6 @@ The message counts the trials not made. The detections at S016 in the two runs:
 c(listening_6_hours = sum(sim$detections$station_id == "S016"),
   recovered_at_3_hours = sum(sim_recovered$detections$station_id == "S016"))
 ```
-
-S016 logged `r sum(sim$detections$station_id == "S016")` detections when it listened for the
-whole run and `r sum(sim_recovered$detections$station_id == "S016")` when it was recovered at
-3 hours.
-
-A station listens in an hour when its deployments cover at least `min_cover` of it, half by
-default, the rule of `detfield::bin_detections()`. Every remaining detection therefore falls in
-an hour that `bin_detections()`, given the same deployments, counts as listening.
 
 ## 5. Detection that varies from hour to hour
 
@@ -420,8 +401,7 @@ mapped_hour
 ```
 
 `surface_map()` is a page helper that draws one location surface over the lake with the
-receivers and the animal's true transmissions in the hour. It is long because it builds the
-outline of the 95% region and zooms to the surface.
+receivers and the animal's true transmissions in the hour.
 
 ```{r surface-map-helper}
 # Map one animal-hour: water by depth, the surface in magma from 0 to its
@@ -516,8 +496,7 @@ surface_map <- function(surfaces, animal, hour, lake, receivers, detections,
 
 Animal `r mapped_hour$animal_id` in the hour from
 `r format(mapped_hour$bin_start, "%H:%M", tz = "UTC")` UTC is the animal-hour of Figure 1,
-and the error of its surface mean is `r round(mapped_hour$error_mean_m)` m. A poor hour shows
-what the hit rate averages over. The chunk below takes, of the same most-heard animal-hours, the
+and the error of its surface mean is `r round(mapped_hour$error_mean_m)` m. The chunk below takes, of the same most-heard animal-hours, the
 one with the lowest share of true positions inside its region, and maps it with `surface_map()`
 (Figure 3).
 
@@ -541,7 +520,7 @@ surface_map(surfaces, poor_hour$animal_id, poor_hour$bin_start, lake,
 
 *Figure 3. Animal `r poor_hour$animal_id` from
 `r format(poor_hour$bin_start, "%H:%M", tz = "UTC")` UTC, heard by
-`r poor_hour$receivers_heard` receivers`r if (poor_hour$receivers_heard == 1) ", so its surface is a ring round the one receiver" else ""`:
+`r poor_hour$receivers_heard` receivers:
 `r round(poor_hour$in_region * poor_hour$n_truth)` of its `r poor_hour$n_truth` true positions lie
 inside the 95% region, and the surface mean is `r round(poor_hour$error_mean_m)` m from their
 mean.*
