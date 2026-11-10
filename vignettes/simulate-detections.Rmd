@@ -1,0 +1,548 @@
+---
+title: "Simulate and score an array step by step"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simulate and score an array step by step}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE, purl = FALSE}
+options(width = 76)
+# A figure whose pixels are all opaque is written without its alpha channel:
+# the same pixels in a smaller file.
+opaque_png <- function(path) {
+  x <- png::readPNG(path)
+  if (length(dim(x)) == 3 && dim(x)[3] == 4 && all(x[, , 4] == 1)) {
+    png::writePNG(x[, , 1:3], path)
+  }
+  path
+}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 4.4, out.width = "100%", dpi = 117,
+                      fig.process = if (requireNamespace("png", quietly = TRUE)) opaque_png)
+```
+
+`evaluate_array()` runs a whole simulation in one call. This page runs it one step at a time,
+from tracks to location surfaces and scores. It opens with where the chain ends: the location
+surface of one animal-hour (Figure 1), which section 6 builds step by step.
+
+```{r opening-surface, echo = FALSE, purl = FALSE, message = FALSE, fig.height = 5.4, fig.alt = "Location surface of one animal-hour on Stoney Lake in magma colours over water drawn by depth, with its 95% region outlined, three yellow rings for the receivers that heard the animal, white rings for silent receivers, and the animal's true transmissions as green points and red crosses."}
+# Draw the map of section 6 as a preview from evaluate_array(); the code is
+# shown there
+library(ggplot2)
+eval(parse(text = knitr::knit_code$get("surface-map-helper")))
+hero_lake <- terra::rast(system.file("extdata", "stoney_depth.tif",
+                                     package = "arraydesign"))
+hero_receivers <- arraydesign::place_receivers(
+  terra::ifel(abs(hero_lake) < 1, NA, hero_lake), n = 20, method = "grid",
+  seed = 1
+)
+hero_model <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
+                                    depth = c(1, 35))
+hero_eval <- arraydesign::evaluate_array(
+  hero_receivers, hero_lake, hero_model, n_animals = 20,
+  seed = 1, control = list(hours = 6, tag_delay = c(120, 180))
+)
+hero_overall <- hero_eval$score$overall
+hero_detections <- hero_eval$detections$detections
+hero_detections$bin_start <- as.POSIXct(
+  floor(as.numeric(hero_detections$datetime) / 3600) * 3600,
+  origin = "1970-01-01", tz = "UTC"
+)
+hero_heard_by <- aggregate(receiver_serial ~ animal_id + bin_start,
+                           data = hero_detections,
+                           FUN = function(serials) length(unique(serials)))
+hero_ties <- merge(
+  hero_heard_by[hero_heard_by$receiver_serial ==
+                  max(hero_heard_by$receiver_serial), ],
+  hero_eval$score$bins[c("animal_id", "bin_start", "n_truth", "in_region")]
+)
+hero_hour <- hero_ties[which.min(abs(hero_ties$in_region -
+                                       hero_overall$hit_rate)), ]
+surface_map(hero_eval$surfaces, hero_hour$animal_id, hero_hour$bin_start,
+            hero_lake, hero_receivers, hero_eval$detections$detections,
+            hero_eval$detections$transmissions)
+```
+
+*Figure 1. The location surface of one animal-hour of the reference run of `evaluate_array()`
+(20 animals over 6 hours) on the 20-receiver grid, rebuilt step by step in section 6, with the
+animal's true transmissions in the hour.*
+
+The 95% region of an hourly surface holds a moving animal about half the time. The hit rate of
+this run, which averages over animal-hours the share of each hour's true positions inside its
+region, is `r sprintf("%.3f", hero_overall$hit_rate)`, because the surface treats the animal as
+still for the hour while it swims about `r sprintf("%.1f", 30 * 60 / 1000)` km. In the hour
+mapped, `r round(hero_hour$in_region * hero_hour$n_truth)` of the animal's
+`r hero_hour$n_truth` true positions lie inside the region.
+
+Each step below returns a table you can inspect, change or pass to your own code. Sections 4 and
+5 add receivers that stop listening part way through, and detection that varies from hour to
+hour. This page's code is included as `simulate-detections.R` in
+`system.file("scripts", package = "arraydesign")`.
+
+The lake, the array and the range model are those of [Get started](arraydesign.html): Stoney
+Lake at 100 m, the 20-receiver grid, and the example's assumed range model. The first step
+loads the packages, reads the lake and lays the grid.
+
+```{r set-up-the-array}
+# Load the package, and ggplot2 for the maps
+library(arraydesign)
+library(ggplot2)
+
+# Read the depth raster of Stoney Lake
+lake <- terra::rast(system.file("extdata", "stoney_depth.tif",
+                                package = "arraydesign"))
+
+# Lay a grid of 20 receivers over water at least 1 m deep
+deployable <- terra::ifel(abs(lake) < 1, NA, lake)
+receivers <- place_receivers(deployable, n = 20, method = "grid", seed = 1)
+nrow(receivers)
+```
+
+The range model is `detfield::de_logistic()`, which serves when no range test exists, and
+the detection field holds one probability per receiver and water cell.
+
+```{r detection-field}
+# Set the assumed d50 and d05 for receivers 1 m and 35 m deep
+range_model <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
+                                     depth = c(1, 35))
+
+# Build the field: distances through water, then the curve at each
+# distance and depth
+field <- detfield::de_field(detfield::water_distances(lake, receivers),
+                            range_model)
+
+# Print the column that names the receivers of the field
+field$key
+```
+
+The message from `de_field()` counts the receiver and cell pairs with `p >= 0.05` that have land
+on the straight line between them. A curve from `de_logistic()` reads a pair with land on the
+line at the distance through water; `blocked` in `?detfield::de_model` sets how much less
+such pairs hear.
+
+The field is keyed by station, because the receivers have a `station_id`. Its `lookup` names
+the receiver at each station, which the detections take as `receiver_serial`.
+
+## 1. Tracks
+
+The tracks are those of the reference run in the
+[**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/) R package, **arraydesign** in
+a browser: 20 animals for 6 hours (360 steps of 60 s) from midnight UTC,
+under the correlated random walk of [Specifying and testing movement models](movement-models.html).
+The print gives the steps taken as drawn and reflected at the shore, and the first positions.
+
+```{r simulate-tracks}
+# Build a walk: gamma steps of mean 30 m a minute, turns of sd 40 degrees
+walk <- crw_model(step_mean = 30, step_sd = 15, turn_sd = 40, time_step_s = 60)
+
+# Walk 20 animals for 360 steps of 60 s from midnight UTC
+start <- as.POSIXct("2025-01-01 00:00:00", tz = "UTC")
+tracks <- simulate_tracks(lake, walk, n_animals = 20, n_steps = 360,
+                          control = track_control(start_time = start),
+                          seed = 1)
+tracks
+```
+
+## 2. Transmissions
+
+Each animal's tag transmits with a random delay of 120 to 180 s from the start of one
+transmission to the start of the next, a mean of 24 an hour. The position of each transmission
+is interpolated along the step during which it was sent. The chunk returns one row per
+transmission.
+
+```{r simulate-transmissions}
+# Send a transmission every 120 to 180 s along each track
+transmissions <- simulate_transmissions(tracks, tag_delay = c(120, 180),
+                                        seed = 1)
+head(transmissions)
+
+# Count the transmissions in all, and per animal-hour
+nrow(transmissions)
+nrow(transmissions) / (20 * 6)
+```
+
+## 3. Detections
+
+Each receiver of the field has one chance to detect each transmission, with the probability the
+field gives for the cell the transmission was sent from. The example's assumed range model has
+no spread from hour to hour, so the trials are independent (`overdispersion = "none"`).
+
+```{r simulate-detections}
+# Give each receiver one trial per transmission
+sim <- simulate_detections(transmissions, field, overdispersion = "none",
+                           seed = 1)
+sim
+```
+
+`sim$detections` has the columns of a real detection file. `sim$transmissions` keeps the truth:
+every transmission, where it was sent from, and how many receivers heard it. The next chunk
+gives, per animal, the share of transmissions heard by at least one receiver.
+
+```{r detection-rate-per-animal}
+# Take every transmission, with the number of receivers that heard it
+truth <- sim$transmissions
+
+# Compute the share of each animal's transmissions heard by any receiver
+rate <- tapply(truth$n_detections > 0, truth$path_id, mean)
+round(rate, 3)
+
+# Give the mean, standard error and median across animals, and the
+# animals never heard
+c(mean = mean(rate), se = sd(rate) / sqrt(length(rate)), median = median(rate))
+sum(rate == 0)
+```
+
+These rates match
+[step 4 of Get started](arraydesign.html#simulate-animals-and-their-detections) and the app's
+Simulation tab, because `evaluate_array()` and the app draw the tracks, the transmissions and
+the detections in the same order. An animal-hour with no detection cannot be positioned; the
+next chunk counts those that have one.
+
+```{r animal-hours-heard}
+# Find the hour of the run in which each transmission was sent, 0 to 5
+hour_of_run <- floor(as.numeric(truth$datetime - start, units = "hours"))
+
+# Find the animal-hours with at least one detection, as a share of all 120
+heard_hours <- unique(data.frame(path_id = truth$path_id,
+                                 hour = hour_of_run)[truth$n_detections > 0, ])
+nrow(heard_hours) / (20 * 6)
+```
+
+These are the animal-hours that `evaluate_array()` scores in
+[step 5 of Get started](arraydesign.html#score-positions). Figure 2 maps the north-east basin,
+where the heard transmissions lie close to the receivers.
+
+```{r map-detected-transmissions, fig.alt = "Close-up of the north-east basin of Stoney Lake: pale grey tracks with white start points, green heard transmissions near the receivers, small red crosses along the tracks elsewhere."}
+# Take the water cells, with depth as positive metres
+water <- terra::as.data.frame(lake, xy = TRUE, na.rm = TRUE)
+names(water)[3] <- "depth_m"
+water$depth_m <- abs(water$depth_m)
+
+# Convert the tracks to a plain table
+paths <- as.data.frame(tracks)[c("path_id", "x", "y")]
+
+# Map the tracks, misses, heard transmissions, the starts (the first
+# position of each track) and receivers over the basin. The colour scale keys
+# the tracks and transmissions; the shape scale keys the receivers, a dark
+# ring under a coloured one
+ring <- detfield::positionr_ring_colours()
+ggplot(water, aes(x, y)) +
+  geom_raster(aes(fill = depth_m)) +
+  detfield::scale_fill_depth() +
+  geom_path(data = paths, aes(group = path_id, colour = "Track"),
+            linewidth = 1) +
+  geom_point(data = truth[truth$n_detections == 0, ], aes(colour = "Not heard"),
+             shape = 4, size = 0.8, stroke = 0.4, alpha = 0.8) +
+  geom_point(data = truth[truth$n_detections > 0, ], aes(colour = "Heard"),
+             shape = 21, fill = "#2ECC40", size = 1.8, stroke = 0.3) +
+  geom_point(data = paths[!duplicated(paths$path_id), ], aes(colour = "Start"),
+             shape = 21, fill = "white", size = 2, stroke = 0.5) +
+  scale_colour_manual(
+    name = NULL, breaks = c("Track", "Start", "Heard", "Not heard"),
+    values = c(Track = "grey85", Start = "black", Heard = "black",
+               `Not heard` = "red3"),
+    # The key draws the cross larger than the map does, so that it reads
+    guide = guide_legend(position = "bottom",
+                         override.aes = list(size = c(1, 2, 1.8, 1.6),
+                                             stroke = c(0.5, 0.5, 0.3, 0.6),
+                                             alpha = 1))
+  ) +
+  geom_point(data = receivers, aes(shape = "Receiver"), colour = ring[["edge"]],
+             size = 4, stroke = 2.2) +
+  geom_point(data = receivers, aes(shape = "Receiver"), colour = ring[["heard"]],
+             size = 4, stroke = 1.1) +
+  scale_shape_manual(name = NULL, values = c(Receiver = 21)) +
+  coord_equal(xlim = c(730300, 737100), ylim = c(4937700, 4941940),
+              expand = FALSE) +
+  labs(x = "Easting (m)", y = "Northing (m)") +
+  detfield::annotation_scale_bar(location = "br") +
+  detfield::theme_positionr()
+```
+
+*Figure 2. Tracks and transmissions of the 20 simulated animals of the reference run over 6
+hours in the north-east basin of Stoney Lake, heard by some receiver or not, with the starts in
+view.*
+
+## 4. Receivers that stop listening
+
+When the field is built from a deployments table with `deploy_datetime` and `recover_datetime`, a
+station makes a trial only while a receiver is in the water there. Here the receiver at S016,
+the deepest station of the array, is recovered three hours into the run.
+
+```{r deployments-table}
+# Put every receiver in the water from a day before the run to a day after
+deployments <- data.frame(receiver_serial = receivers$receiver_serial,
+                          station_id = receivers$station_id,
+                          x = receivers$x, y = receivers$y,
+                          deploy_z = receivers$deploy_z,
+                          deploy_datetime = start - 86400,
+                          recover_datetime = start + 86400)
+
+# Recover the receiver at S016 three hours into the run
+recovered <- deployments$station_id == "S016"
+deployments$recover_datetime[recovered] <- start + 3 * 3600
+deployments[recovered, c("station_id", "deploy_z", "deploy_datetime",
+                         "recover_datetime")]
+```
+
+This field is built from the deployment table, which records when each station listened. The
+same transmissions are simulated again under it, with the same seed, so the two runs differ
+only where the field differs.
+
+```{r receiver-recovered-early}
+# Build the field from the deployments, then simulate with the same
+# transmissions and seed
+field_recovered <- detfield::de_field(
+  detfield::water_distances(lake, deployments), range_model
+)
+sim_recovered <- simulate_detections(transmissions, field_recovered,
+                                     overdispersion = "none", seed = 1)
+```
+
+The message counts the trials not made. The detections at S016 in the two runs:
+
+```{r detections-at-s016}
+# Count the detections at S016, listening for 6 hours and recovered at
+# 3 hours
+c(listening_6_hours = sum(sim$detections$station_id == "S016"),
+  recovered_at_3_hours = sum(sim_recovered$detections$station_id == "S016"))
+```
+
+S016 logged `r sum(sim$detections$station_id == "S016")` detections when it listened for the
+whole run and `r sum(sim_recovered$detections$station_id == "S016")` when it was recovered at
+3 hours.
+
+A station listens in an hour when its deployments cover at least `min_cover` of it, half by
+default, the rule of `detfield::bin_detections()`. Every remaining detection therefore falls in
+an hour that `bin_detections()`, given the same deployments, counts as listening.
+
+## 5. Detection that varies from hour to hour
+
+Range tests often vary more from hour to hour than a binomial allows: a receiver hears well in
+one hour and badly in the next, for every animal at once. `detfield::de_model()` adds that spread
+as a standard deviation on the logit scale for each station and hour. The value of 1 below is
+assumed; no range test of the example measured it.
+
+```{r hourly-spread}
+# Add a station-hour sd of 1 on the logit scale to the range model
+spread_model <- detfield::de_model(range_model, sigma = list(station_hour = 1))
+
+# Build its detection field
+field_spread <- detfield::de_field(detfield::water_distances(lake, receivers),
+                                   spread_model)
+```
+
+`simulate_detections()` draws the spread by default. The table compares the detection rate per
+animal with and without it.
+
+```{r detections-with-spread}
+# Simulate with the same transmissions and seed, with the spread drawn
+sim_spread <- simulate_detections(transmissions, field_spread, seed = 1)
+
+# Compare the detection rate per animal, without and with the spread
+rate_spread <- tapply(sim_spread$transmissions$n_detections > 0,
+                      sim_spread$transmissions$path_id, mean)
+round(rbind(static = summary(rate), with_spread = summary(rate_spread)), 3)
+```
+
+The spread leaves the mean detection rate per animal almost unchanged
+(`r sprintf("%.3f", mean(rate_spread))` against `r sprintf("%.3f", mean(rate))`) and widens the
+range across animals (highest `r sprintf("%.3f", max(rate_spread))` against
+`r sprintf("%.3f", max(rate))`).
+
+## 6. Counts, location surfaces and scores
+
+The [**detfield**](https://jakebrownscombe.github.io/detfield/) R package takes the simulated
+detections as it takes real ones. The first step is a listening
+table: when each receiver was in the water.
+
+```{r listening-table}
+# Set every receiver listening from a day before the run to a day after
+listening <- data.frame(receiver_serial = receivers$receiver_serial,
+                        station_id = receivers$station_id,
+                        deploy_datetime = start - 86400,
+                        recover_datetime = start + 86400)
+```
+
+`detfield::bin_detections()` counts the detections per animal, receiver and hour, given when
+each receiver listened. `y` is the detections and `n` the transmissions expected in the hour.
+
+```{r bin-detections}
+# Count the detections per animal, receiver and hour
+counts <- detfield::bin_detections(sim$detections, listening,
+                                   tag_delay = c(120, 180))
+head(counts)
+```
+
+`detfield::location_surface()` turns the counts into the probability that the animal was in each
+water cell, one surface per animal-hour.
+
+```{r location-surfaces}
+# Compute one surface per animal-hour with a detection
+surfaces <- detfield::location_surface(counts, field, overdispersion = "none")
+```
+
+`score_surfaces()` measures the surfaces against the true transmissions. It scores any surfaces
+whose true positions you know, such as those of a range model you fitted with other settings.
+
+```{r score-surfaces}
+# Score the error and hit rate of each surface against the truth
+score <- score_surfaces(surfaces, truth)
+score
+head(score$bins[c("animal_id", "bin_start", "n_truth", "error_mean_m",
+                  "in_region", "area_m2")])
+```
+
+Figure 1 maps one animal-hour. The next chunk picks it: of the animal-hours heard by the most
+receivers, the one whose share of true positions inside its 95% region is nearest the run's hit
+rate.
+
+```{r pick-the-mapped-hour}
+# Count the receivers that heard each animal-hour
+heard_by <- aggregate(y ~ animal_id + bin_start, data = counts,
+                      FUN = function(detections) sum(detections > 0))
+names(heard_by)[3] <- "receivers_heard"
+
+# Find the animal-hours heard by the most receivers, with their scores
+most_heard <- merge(
+  heard_by[heard_by$receivers_heard == max(heard_by$receivers_heard), ],
+  score$bins[c("animal_id", "bin_start", "n_truth", "error_mean_m",
+               "in_region")]
+)
+most_heard
+
+# Pick the one nearest the run's hit rate
+mapped_hour <- most_heard[which.min(abs(most_heard$in_region -
+                                          score$overall$hit_rate)), ]
+mapped_hour
+```
+
+`surface_map()` is a page helper that draws one location surface over the lake with the
+receivers and the animal's true transmissions in the hour. It is long because it builds the
+outline of the 95% region and zooms to the surface.
+
+```{r surface-map-helper}
+# Map one animal-hour: water by depth, the surface in magma from 0 to its
+# largest cell, the 95% region outlined, receivers that heard the animal as
+# yellow rings sized by their detections, silent receivers as white rings,
+# and the animal's true transmissions in the hour, keyed with the outline
+surface_map <- function(surfaces, animal, hour, lake, receivers, detections,
+                        truth, margin = 500) {
+  # Take the cells of the one surface, with their coordinates
+  hour_cells <- surfaces[surfaces$animal_id == animal &
+                           surfaces$bin_start == hour, ]
+  hour_cells <- cbind(hour_cells, terra::xyFromCell(lake, hour_cells$cell))
+
+  # Outline its 95% region
+  region <- detfield::credible_region(surfaces, level = 0.95)
+  region <- region[region$animal_id == animal & region$bin_start == hour, ]
+  outline <- terra::rast(lake)
+  outline[region$cell] <- 1
+  outline <- terra::geom(terra::as.polygons(outline), df = TRUE)
+
+  # Take the true transmissions and detections of the animal in the hour
+  in_hour <- function(times) times >= hour & times < hour + 3600
+  hour_truth <- truth[truth$animal_id == animal & in_hour(truth$datetime), ]
+  hour_detections <- detections[detections$animal_id == animal &
+                                  in_hour(detections$datetime), ]
+
+  # Count the detections per receiver in the hour
+  rings <- data.frame(receiver_serial = receivers$receiver_serial,
+                      x = receivers$x, y = receivers$y)
+  rings$n <- as.vector(table(factor(hour_detections$receiver_serial,
+                                    levels = rings$receiver_serial)))
+  heard <- rings[rings$n > 0, ]
+
+  # Zoom to the surface, the receivers that heard and the truth
+  in_view <- rbind(hour_cells[c("x", "y")], heard[c("x", "y")],
+                   hour_truth[c("x", "y")])
+  xlim <- range(in_view$x) + c(-margin, margin)
+  ylim <- range(in_view$y) + c(-margin, margin)
+
+  # Take the water in view, coloured by depth with the ramp of
+  # detfield::scale_fill_depth(). The fill scale holds the probability, so
+  # the depth key is an alpha scale held at 1 whose boxes take the ramp
+  depth_ramp <- scales::seq_gradient_pal("cornflowerblue", "blue4")
+  water <- terra::as.data.frame(abs(lake), xy = TRUE, na.rm = TRUE)
+  names(water)[3] <- "depth_m"
+  deepest <- max(water$depth_m)
+  water$colour <- depth_ramp(water$depth_m / deepest)
+  depth_breaks <- pretty(c(0, deepest), n = 3)
+  depth_breaks <- depth_breaks[depth_breaks <= deepest]
+  water <- water[water$x > xlim[1] - 100 & water$x < xlim[2] + 100 &
+                   water$y > ylim[1] - 100 & water$y < ylim[2] + 100, ]
+
+  # Draw the layers
+  top_prob <- max(hour_cells$prob)
+  cell_size <- terra::res(lake)[1]
+  ggplot(hour_cells, aes(x, y)) +
+    geom_tile(data = water, aes(fill = I(.data$colour), alpha = .data$depth_m),
+              width = cell_size, height = cell_size) +
+    scale_alpha_continuous(
+      name = "Depth (m)", range = c(1, 1), limits = c(0, deepest),
+      breaks = depth_breaks,
+      guide = guide_legend(position = "bottom", nrow = 1, override.aes = list(
+        fill = depth_ramp(depth_breaks / deepest)
+      ))
+    ) +
+    geom_tile(aes(fill = .data$prob), width = cell_size, height = cell_size) +
+    detfield::scale_fill_probability(
+      name = "Probability\nper cell", limits = c(0, top_prob),
+      breaks = c(0, top_prob), labels = signif(c(0, top_prob), 2)
+    ) +
+    geom_path(data = outline, aes(group = interaction(.data$part, .data$hole),
+                                  colour = "95% region"), linewidth = 0.9) +
+    detfield::layer_receivers(rings, count = "n", size = 3, max_size = 9) +
+    geom_point(data = hour_truth[hour_truth$n_detections == 0, ],
+               aes(colour = "Not heard"), shape = 4, size = 1.6, stroke = 0.7) +
+    geom_point(data = hour_truth[hour_truth$n_detections > 0, ],
+               aes(colour = "Heard"), shape = 21, fill = "#2ECC40", size = 2,
+               stroke = 0.3) +
+    scale_colour_manual(
+      name = NULL, breaks = c("95% region", "Heard", "Not heard"),
+      values = c(`95% region` = "#00A087", Heard = "black", `Not heard` = "red3")
+    ) +
+    coord_equal(xlim = xlim, ylim = ylim, expand = FALSE) +
+    labs(title = sprintf("Animal %s, %s to %s UTC", animal,
+                         format(hour, "%H:%M", tz = "UTC"),
+                         format(hour + 3600, "%H:%M", tz = "UTC")),
+         x = "Easting (m)", y = "Northing (m)") +
+    detfield::annotation_scale_bar(location = "br") +
+    detfield::theme_positionr()
+}
+```
+
+Animal `r mapped_hour$animal_id` in the hour from
+`r format(mapped_hour$bin_start, "%H:%M", tz = "UTC")` UTC is the animal-hour of Figure 1,
+and the error of its surface mean is `r round(mapped_hour$error_mean_m)` m. A poor hour shows
+what the hit rate averages over. The chunk below takes, of the same most-heard animal-hours, the
+one with the lowest share of true positions inside its region, and maps it with `surface_map()`
+(Figure 3).
+
+```{r pick-a-poor-hour}
+# Take the most-heard animal-hour with the lowest share inside its region
+poor_hour <- most_heard[which.min(most_heard$in_region), ]
+poor_hour
+```
+
+```{r poor-hour-guard, include = FALSE, purl = FALSE}
+# Figure 3 must not draw the hour of Figure 1
+stopifnot(poor_hour$animal_id != mapped_hour$animal_id ||
+            poor_hour$bin_start != mapped_hour$bin_start)
+```
+
+```{r map-a-poor-hour, message = FALSE, fig.height = 5.4, fig.alt = "Location surface of a poorly placed animal-hour on Stoney Lake: magma cells over water drawn by depth, the 95% region outlined, yellow rings for the receivers that heard the animal, white rings for silent receivers, and the animal's true transmissions, most of them outside the region."}
+# Map the poor hour from the surfaces of this section
+surface_map(surfaces, poor_hour$animal_id, poor_hour$bin_start, lake,
+            receivers, sim$detections, truth)
+```
+
+*Figure 3. Animal `r poor_hour$animal_id` from
+`r format(poor_hour$bin_start, "%H:%M", tz = "UTC")` UTC, heard by
+`r poor_hour$receivers_heard` receivers`r if (poor_hour$receivers_heard == 1) ", so its surface is a ring round the one receiver" else ""`:
+`r round(poor_hour$in_region * poor_hour$n_truth)` of its `r poor_hour$n_truth` true positions lie
+inside the 95% region, and the surface mean is `r round(poor_hour$error_mean_m)` m from their
+mean.*
+

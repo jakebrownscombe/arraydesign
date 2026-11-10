@@ -1,0 +1,527 @@
+---
+title: "Design an array for your own water body: compare layouts"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Design an array for your own water body: compare layouts}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE, purl = FALSE}
+options(width = 76)
+# A figure whose pixels are all opaque is written without its alpha channel:
+# the same pixels in a smaller file.
+opaque_png <- function(path) {
+  x <- png::readPNG(path)
+  if (length(dim(x)) == 3 && dim(x)[3] == 4 && all(x[, , 4] == 1)) {
+    png::writePNG(x[, , 1:3], path)
+  }
+  path
+}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 5.4, out.width = "100%", dpi = 117,
+                      fig.process = if (requireNamespace("png", quietly = TRUE)) opaque_png)
+```
+
+This page starts from your own data: a depth raster, one or more lists of candidate stations,
+and a range test. It lays the candidates side by side, scores them on the same simulated
+animals, and writes the chosen stations for the field crew. The candidates can be arrays for a
+new study or changes to an array already in the water, such as moving or adding stations. The
+Stoney Lake example data of **arraydesign** and of the
+[**detfield**](https://jakebrownscombe.github.io/detfield/) R package stand in for yours. Each
+step is run once, and explained, in [Get started](arraydesign.html); this page uses the steps
+and does not repeat them.
+
+```{r opening-coverage, echo = FALSE, purl = FALSE, message = FALSE, fig.height = 5.6, fig.alt = "Three maps of Stoney Lake in magma colours with yellow receiver rings: the 20 planned stations on a grid, 20 at random, and a grid of 30, each with bright patches round the receivers and most of the water dark."}
+# Run the code of sections 1, 3 and 4 to draw Figure 1 first; the code is
+# shown there
+opening_chunks <- c("read-your-files", "your-own-range-model",
+                    "deployable-water", "lay-out-planned-array",
+                    "lay-out-other-arrays", "build-detection-fields",
+                    "array-coverage", "map-candidate-coverage")
+opened <- eval(parse(text = unlist(knitr::knit_code$get(opening_chunks))))
+
+# Give the share of water at p >= 0.5 under a design, in percent
+share_at_half <- function(design) {
+  round(100 * mean(array_cover$p[array_cover$design == panel_names[[design]]] >= 0.5))
+}
+coverage_map
+```
+
+*Figure 1. Probability that at least one receiver of each candidate array hears
+one transmission from each 100 m water cell of Stoney Lake: (a) the 20 planned stations; (b) 20
+receivers at random water cells at least 1 m deep and 1 km apart; (c) a grid of 30. From the
+range model fitted in section 2, at the distance through water and the depth of each
+receiver.*
+
+With ten more receivers, the grid of 30 brings `r share_at_half("grid_30")`% of the water to a
+probability of 0.5 or more; the planned 20 reach `r share_at_half("planned")`% and 20 at random
+`r share_at_half("random_20")`%. Section 5 scores what the extra receivers
+add to detections and positions.
+
+`system.file("scripts", package = "arraydesign")` holds this page's code as `design-an-array.R`;
+copy it and change the file names to yours.
+
+## 1. Read your files
+
+The depth raster is in a projected coordinate system in metres, with land as `NA`; depth may be
+stored as positive or negative numbers. The station list has a `station_id` and either
+`deploy_lat` and `deploy_lon` in WGS 84 or `x` and `y` in the raster's coordinate system. The
+range test has one row per receiver, tag and hour, with the receiver's depth, the distance to
+the tag, the transmissions sent and the detections heard. Here the range test is
+`detfield::stoney_range_test`, two lines of receivers at 1 m and 25 m simulated from the
+example's assumed range model; read yours with `read.csv()`. Replace the paths with yours.
+
+```{r read-your-files}
+# Load the package, and ggplot2 for the figures
+library(arraydesign)
+library(ggplot2)
+
+# Read your depth raster and candidate stations
+lake <- terra::rast(system.file("extdata", "stoney_depth.tif",
+                                package = "arraydesign"))
+planned <- read.csv(system.file("extdata", "planned_stations.csv",
+                                package = "arraydesign"))
+
+# Take the range test: one row per receiver, tag and hour
+range_test <- detfield::stoney_range_test
+
+# Check the raster's coordinate system and cell size, m
+terra::crs(lake, describe = TRUE)$code
+terra::res(lake)
+
+# Check the stations, and the receiver depths of the range test, m
+head(planned, 3)
+table(range_test$depth_m)
+```
+
+## 2. The range model: yours or the default
+
+Neither **arraydesign** nor **detfield**, which turns a range model into detection fields, fits
+a range model. You fit it to your own range test, with
+the model of your choice, and pass the fit to `detfield::de_model()`. Here it is a logistic
+regression on distance, receiver depth and their interaction.
+
+```{r your-own-range-model}
+# Fit a logistic regression of detections on distance and receiver depth
+range_fit <- glm(cbind(heard, sent - heard) ~ distance_m * depth_m,
+                 family = binomial, data = range_test)
+
+# Pass the fit to detfield as the range model of this page
+range_model <- detfield::de_model(range_fit)
+range_model
+```
+
+A model that also varies over time, by hour or season, goes in through `detfield::de_model()`
+the same way; the
+[**detfield** range-model article](https://jakebrownscombe.github.io/detfield/articles/range-model.html)
+fits one.
+
+`detfield::de_logistic()` stands in where no range test was run: a logistic curve through
+`d50` and `d05` given at two receiver depths and interpolated between them. [Get started](arraydesign.html) uses it with the
+example's assumed values. The chunk reads both models at the two depths of the test and at
+10 m, between them.
+
+```{r compare-the-two-models}
+# Set the stand-in of Get started: d50 and d05 for receivers 1 m and 35 m deep
+stand_in <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
+                                  depth = c(1, 35))
+
+# Read the detection probability of each model at 250, 500 and 750 m
+distances <- c(250, 500, 750)
+probability <- do.call(rbind, lapply(c(1, 10, 25), function(depth) {
+  data.frame(depth_m = depth, distance_m = distances,
+             fitted = round(plogis(range_model$predict(distances,
+                                                       depth_m = depth)), 3),
+             stand_in = round(plogis(stand_in$predict(distances,
+                                                      depth_m = depth)), 3))
+}))
+probability
+```
+
+The next chunk finds the largest difference between the two at each depth, over every 10 m
+from 0 to 1,500 m.
+
+```{r largest-difference}
+# Find the largest difference in detection probability, and where, per depth
+fine_distances <- seq(0, 1500, by = 10)
+largest <- do.call(rbind, lapply(c(1, 10, 25), function(depth) {
+  gap <- abs(plogis(range_model$predict(fine_distances, depth_m = depth)) -
+               plogis(stand_in$predict(fine_distances, depth_m = depth)))
+  data.frame(depth_m = depth, largest = round(max(gap), 3),
+             at_m = fine_distances[which.max(gap)])
+}))
+largest
+```
+
+At 1 m and 25 m, where the test has data, the two agree to within
+`r sprintf("%.3f", max(largest$largest[largest$depth_m != 10]))`. At 10 m they differ by up to
+`r sprintf("%.3f", largest$largest[largest$depth_m == 10])`, at
+`r largest$at_m[largest$depth_m == 10]` m: a test at two depths cannot say how range changes between them, and each model assumes a shape
+(linear in depth on the logit scale for the fit, linear `d50` and `d05` for the stand-in).
+Receivers deeper than 25 m are an extrapolation. A test at a third depth would show which is right.
+This page uses the fit.
+
+## 3. Lay out the candidate arrays
+
+Water shallower than 1 m is set to `NA` first, so that no grid or random receiver goes where it
+cannot be moored.
+
+```{r deployable-water}
+# Set water shallower than 1 m to NA
+deployable <- terra::ifel(abs(lake) < 1, NA, lake)
+```
+
+Your station list goes in with `method = "manual"`; the stations keep their names, and
+`deploy_z` is the depth under each. The station file included with the package holds the 20-receiver grid of
+Get started, so "planned" below is that array read from a file.
+
+```{r lay-out-planned-array}
+# Place the planned stations on the raster
+planned_receivers <- place_receivers(lake, method = "manual",
+                                     coords = planned)
+head(planned_receivers, 3)
+```
+
+A station that falls just on land, within one cell diagonal of water, moves to the nearest
+water cell with a message. A station farther onto land, or off the raster, is refused, and the
+message names its row. Here the longitude of S003 has a typing slip in its second decimal:
+
+```{r station-off-the-raster}
+# Copy the planned stations with a slip in the longitude of row 3
+stations_with_slip <- planned
+stations_with_slip$deploy_lon[3] <- -78.29706
+
+# Try to place them; place_receivers() refuses the row and names it
+try(place_receivers(lake, method = "manual", coords = stations_with_slip))
+```
+
+The other candidates here are 20 receivers at random cells at least 1 km apart and a grid of
+30. A second station list of your own goes in the same way as the first. `designs` holds the
+three.
+
+```{r lay-out-other-arrays}
+# Name the three candidate arrays
+designs <- list(
+  planned = planned_receivers,
+  random_20 = place_receivers(deployable, n = 20, method = "random",
+                              spacing = 1000, seed = 1),
+  grid_30 = place_receivers(deployable, n = 30, method = "grid", seed = 1)
+)
+
+# Count the receivers in each
+sapply(designs, nrow)
+```
+
+The fitted model reads its two test lines at 1 m and 25 m. The chunk gives the deepest receiver
+of each design, m.
+
+```{r deepest-receivers}
+# Give the depth of the deepest receiver in each design, m
+round(sapply(designs, function(layout) max(layout$deploy_z)), 1)
+```
+
+The random layout and the grid of 30 each have a receiver deeper than 25 m
+(`r sprintf("%.1f", max(designs$random_20$deploy_z))` m and
+`r sprintf("%.1f", max(designs$grid_30$deploy_z))` m), where the fitted model is read beyond its
+deepest test line.
+
+A grid can also be set by its spacing; the number of receivers then follows from the water.
+
+```{r grid-by-spacing}
+# Count the receivers in a grid 2 km apart
+nrow(place_receivers(deployable, spacing = 2000))
+```
+
+## 4. Map what each candidate hears
+
+One detection field per design, built as in
+[step 2 of Get started](arraydesign.html#build-the-detection-field-and-map-coverage). The
+message counts the receiver and cell pairs with `p >= 0.05` that have land on the straight line
+between them; `blocked` in `?detfield::de_model` sets how much less such pairs hear.
+
+```{r build-detection-fields}
+# Build one detection field per design
+fields <- lapply(designs, function(layout) {
+  detfield::de_field(detfield::water_distances(lake, layout), range_model)
+})
+```
+
+`coverage_summary()` gives single-receiver coverage of each design at 0.5 and 0.8.
+
+```{r coverage-table}
+# Count the coverage of each design, one row per design and threshold
+coverage <- do.call(rbind, lapply(names(fields), function(design) {
+  cbind(design = design, coverage_summary(fields[[design]]))
+}))
+coverage
+```
+
+The chunk below stacks the array-level probability of
+[step 2 of Get started](arraydesign.html#build-the-detection-field-and-map-coverage) for the
+three designs, with the panel each is drawn in.
+
+```{r array-coverage}
+# Name the panels, in the order of `designs`
+panel_names <- c(planned = "(a) planned, 20", random_20 = "(b) 20 at random",
+                 grid_30 = "(c) grid of 30")
+
+# Compute the probability that any receiver hears, per design and cell
+array_cover <- do.call(rbind, lapply(names(fields), function(design) {
+  data.frame(design = panel_names[[design]],
+             p = 1 - apply(1 - fields[[design]]$p, 1, prod),
+             terra::xyFromCell(lake, fields[[design]]$cells))
+}))
+
+# Give the share of water cells at p >= 0.5, per design
+tapply(array_cover$p >= 0.5, array_cover$design, mean)
+```
+
+The next chunk draws Figure 1, at the top of the page.
+
+```{r map-candidate-coverage, fig.show = "hide"}
+# Stack the receivers of the designs, with the panel each is drawn in
+design_rings <- do.call(rbind, lapply(names(designs), function(design) {
+  data.frame(x = designs[[design]]$x, y = designs[[design]]$y,
+             design = panel_names[[design]])
+}))
+
+# Draw one panel per design: the array's probability, and the receivers on
+# top as a dark ring under a coloured one, keyed by the shape scale
+ring <- detfield::positionr_ring_colours()
+coverage_map <- ggplot(array_cover, aes(x, y)) +
+  geom_raster(aes(fill = p)) +
+  detfield::scale_fill_probability(name = "Detection\nprobability") +
+  geom_point(data = design_rings, aes(shape = "Receiver"),
+             colour = ring[["edge"]], size = 0.9, stroke = 0.7) +
+  geom_point(data = design_rings, aes(shape = "Receiver"),
+             colour = ring[["heard"]], size = 0.9, stroke = 0.35) +
+  scale_shape_manual(name = NULL, values = c(Receiver = 21)) +
+  facet_wrap(~design, ncol = 2) +
+  coord_equal(expand = FALSE) +
+  labs(x = "Easting (m)", y = "Northing (m)") +
+  detfield::annotation_scale_bar(location = "br") +
+  detfield::theme_positionr() +
+  theme(legend.position = "inside", legend.position.inside = c(0.75, 0.25))
+coverage_map
+```
+
+`listening` scores the coverage of the receivers in the water on a given day, such as one when
+two have been pulled for download:
+
+```{r coverage-while-two-receivers-are-out}
+# Count the coverage of the planned array with S006 and S016 pulled
+pulled <- c("S006", "S016")
+coverage_summary(fields$planned,
+                 listening = setdiff(planned_receivers$station_id, pulled))
+```
+
+## 5. Score the candidates on the same animals
+
+`evaluate_array()` simulates animals, detects their transmissions through the field, positions
+them and scores the positions, as in
+[step 4 of Get started](arraydesign.html#simulate-animals-and-their-detections). The three
+designs are scored on the same 20 animals over 6 hours: the same tracks and transmissions, heard
+through each design's field.
+
+```{r score-the-designs, message = FALSE}
+# Evaluate each design on the same 20 animals, 6 hours each
+evaluations <- lapply(designs, function(layout) {
+  evaluate_array(layout, lake, range_model, n_animals = 20,
+                 seed = 1, control = list(hours = 6, tag_delay = c(120, 180)))
+})
+```
+
+The chunk returns the detection rate of every animal under every design.
+
+```{r rate-per-animal}
+# Tabulate the detection rate, one row per design and animal
+rates <- do.call(rbind, lapply(names(evaluations), function(design) {
+  sent <- evaluations[[design]]$detections$transmissions
+  rate <- tapply(sent$n_detections > 0, sent$path_id, mean)
+  data.frame(design = panel_names[[design]], animal_id = names(rate),
+             rate = as.vector(rate))
+}))
+head(rates, 3)
+```
+
+The table puts coverage, detection and positioning side by side: `covered_p50`, the share of
+water at 0.5 or more under one receiver alone; `mean_rate`, the mean detection rate per animal;
+`scored_share`, the share of animal-hours with a detection, the only hours that can be
+positioned; and `median_error_m`, the median error of the scored hours.
+
+```{r compare-the-designs}
+# Tabulate coverage, detection and positioning, one row per design
+scores <- do.call(rbind, lapply(names(evaluations), function(design) {
+  overall <- evaluations[[design]]$score$overall
+  design_rates <- rates$rate[rates$design == panel_names[[design]]]
+  data.frame(design = design, receivers = nrow(designs[[design]]),
+             covered_p50 = round(evaluations[[design]]$coverage$share[1], 3),
+             mean_rate = round(mean(design_rates), 3),
+             never_heard = sum(design_rates == 0),
+             scored_share = round(overall$scored_share, 3),
+             median_error_m = round(overall$median_error_mean_m))
+}))
+scores
+```
+
+Figure 2 shows where the differences in `mean_rate` come from: each animal under each array.
+
+```{r plot-rate-by-design, fig.height = 4, fig.alt = "Detection rate of each of 20 simulated animals under three candidate arrays, with a grey line joining each animal across the arrays, a bar at the mean, and the number of animals never heard written under each array."}
+# Compute the mean rate, and the animals never heard, per design
+rate_means <- aggregate(rate ~ design, data = rates, FUN = mean)
+never <- aggregate(rate ~ design, data = rates,
+                   FUN = function(rate) sum(rate == 0))
+never$label <- sprintf("%d at 0%%", never$rate)
+
+# Draw each animal across the designs, its points joined, the means, and
+# the count of animals never heard, which overlap at 0
+ggplot(rates, aes(design, rate)) +
+  geom_line(aes(group = animal_id), colour = "grey70", linewidth = 0.4) +
+  geom_point(colour = "#21908C", alpha = 0.8, size = 1.8) +
+  geom_errorbar(data = rate_means, aes(ymin = rate, ymax = rate), width = 0.4,
+                colour = "grey20", linewidth = 0.8) +
+  geom_text(data = never, aes(y = -0.07, label = label), size = 3.2,
+            colour = "grey20") +
+  scale_y_continuous(labels = function(share) sprintf("%g%%", 100 * share),
+                     breaks = seq(0, 1, 0.25), limits = c(-0.1, 1)) +
+  labs(x = "Candidate array", y = "Share of transmissions heard") +
+  detfield::theme_positionr()
+```
+
+*Figure 2. Detection rate of each of 20 simulated animals across 6 hours under the three
+candidate arrays of Figure 1; lines join one animal across the arrays, and bars mark the
+mean across animals. Animals never heard overlap at 0%, so the label under each array counts
+those overlapping points. The animals, their tracks and their transmissions are the same under
+all three.*
+
+The grid of 30, with ten more receivers, scores `r round(100 * scores$scored_share[3], 1)`% of
+animal-hours against `r round(100 * scores$scored_share[1], 1)`% for the planned 20, with a
+median error of `r scores$median_error_m[3]` m against `r scores$median_error_m[1]` m. Read the
+error beside the scored share: an array that hears few animal-hours can still report a small
+error for the few it hears. Twenty animals over six hours are a small sample, and a difference
+of a few percent can come from which animals were drawn; raise `n_animals` and `hours` before you
+choose.
+
+The planned array is the grid of Get started read from a file. The next chunk scores the grid as
+Get started lays it, and the planned array under both models, on the same animals; each run
+prints its count of receiver-cell pairs with land between them.
+
+```{r planned-under-both-models}
+# Score the grid of Get started and the planned array under the stand-in
+reference_settings <- list(hours = 6, tag_delay = c(120, 180))
+grid_stand_in <- evaluate_array(
+  place_receivers(deployable, n = 20, method = "grid", seed = 1), lake,
+  stand_in, n_animals = 20, seed = 1, control = reference_settings
+)
+planned_stand_in <- evaluate_array(designs$planned, lake, stand_in, n_animals = 20,
+                                   seed = 1, control = reference_settings)
+
+# Compare the hit rates, with the planned array under the fitted model
+round(c(grid_stand_in = grid_stand_in$score$overall$hit_rate,
+        planned_stand_in = planned_stand_in$score$overall$hit_rate,
+        planned_fitted = evaluations$planned$score$overall$hit_rate), 3)
+```
+
+The next chunk compares the two hour by hour: the detections each array heard, and the
+animal-hours whose share of true positions inside the 95% region differs.
+
+```{r station-file-against-grid}
+# Compare the station file and the grid, detections and each animal-hour
+same_detections <- identical(planned_stand_in$detections$detections,
+                             grid_stand_in$detections$detections)
+by_hour <- merge(planned_stand_in$score$bins, grid_stand_in$score$bins,
+                 by = c("animal_id", "bin_start"), suffixes = c("_file", "_grid"))
+differs <- by_hour[by_hour$in_region_file != by_hour$in_region_grid,
+                   c("animal_id", "bin_start", "in_region_file", "in_region_grid")]
+same_detections
+differs
+```
+
+Under the stand-in the planned array scores
+`r sprintf("%.3f", planned_stand_in$score$overall$hit_rate)` and the grid
+`r sprintf("%.3f", grid_stand_in$score$overall$hit_rate)`. The station file holds the grid in
+latitude and longitude, and the round trip through degrees moves each receiver by at most
+`r with(list(a = planned_stand_in$layout, b = grid_stand_in$layout), round(1000 * max(sqrt((a$x - b$x)^2 + (a$y - b$y)^2))))`
+mm; the two fields differ by at most
+`r format(signif(max(abs(planned_stand_in$field$p - grid_stand_in$field$p)), 1), scientific = FALSE)`
+in the probability of any cell. Both arrays hear the same
+`r nrow(grid_stand_in$detections$detections)` detections, and
+`r nrow(by_hour) - nrow(differs)` of `r nrow(by_hour)` animal-hours score the same; in the
+other, animal `r differs$animal_id[1]` at `r format(differs$bin_start[1], "%H:%M", tz = "UTC")`
+UTC, a cell at the edge of the 95% region falls on the other side of it, and the share of true
+positions inside goes from `r sprintf("%.3f", differs$in_region_grid[1])` with the grid to
+`r sprintf("%.3f", differs$in_region_file[1])` with the station file. Under the fitted model
+the planned array scores `r sprintf("%.3f", evaluations$planned$score$overall$hit_rate)`.
+
+### Positioning with a shorter range
+
+A range test describes one place, one season and one transmitter. `perturb_de_model()` copies
+the range model with a shorter range, here half, and `evaluate_array()` positions with that copy
+while the animals are still detected under the true curve.
+
+```{r position-with-half-the-range, message = FALSE}
+# Halve d50 and d05 of the range model
+half_range_model <- perturb_de_model(range_model, d50_scale = 0.5,
+                                     d05_scale = 0.5)
+
+# Detect under the true curve; position with the halved one
+half_range_eval <- evaluate_array(
+  designs$planned, lake, range_model, n_animals = 20, seed = 1,
+  control = list(hours = 6, tag_delay = c(120, 180),
+                 position_model = half_range_model)
+)
+```
+
+The table compares the error and hit rate of the two.
+
+```{r compare-the-ranges}
+# Compare the median error and the hit rate, true range against half
+score_columns <- c("median_error_mean_m", "hit_rate")
+rbind(true_range = evaluations$planned$score$overall[score_columns],
+      half_range = half_range_eval$score$overall[score_columns])
+```
+
+Positioned with half the true range, the planned array's median error is
+`r round(half_range_eval$score$overall$median_error_mean_m)` m, against
+`r round(evaluations$planned$score$overall$median_error_mean_m)` m. Its hit rate (per animal-hour, the
+fraction of true positions inside the 95% region, averaged) falls to
+`r sprintf("%.3f", half_range_eval$score$overall$hit_rate)` from
+`r sprintf("%.3f", evaluations$planned$score$overall$hit_rate)`.
+
+## 6. Write the stations for the field crew
+
+Once a design is chosen, write its stations with their coordinates and the depth at each. Here
+the file goes to a temporary folder; give your own path.
+
+```{r write-the-chosen-stations}
+# Keep station, position and depth of the chosen design, depth to 0.1 m
+chosen <- designs$planned
+field_sheet <- chosen[c("station_id", "deploy_lat", "deploy_lon", "deploy_z")]
+field_sheet$deploy_z <- round(field_sheet$deploy_z, 1)
+
+# Write the sheet and read it back
+sheet_file <- file.path(tempdir(), "stations_for_deployment.csv")
+write.csv(field_sheet, sheet_file, row.names = FALSE)
+head(read.csv(sheet_file), 3)
+
+# Count the stations under 2 m deep
+sum(chosen$deploy_z < 2)
+```
+
+Check with the crew that a receiver can be moored at the
+`r sum(chosen$deploy_z < 2)` stations under 2 m deep before the sheet goes out. After
+deployment, the detections and the deployment log go to the
+[**detqc**](https://jakebrownscombe.github.io/detqc/) R package, which reads, checks and filters
+them, and then to **detfield**, which positions the animals with the range model you used here.
+
+## Point and click
+
+The [**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/) R package is
+**arraydesign** as a point-and-click application. It reads a depth raster and a station CSV,
+places receivers by grid, from the CSV or by clicking on the map, maps coverage, walks
+simulated animals and gives their detection rates, and writes the stations as a CSV. Its range
+model is `d50` and `d05` entered at two receiver depths: it does not fit a range test, so a
+fitted model such as that of section 2 stays in code, and it does not position the simulated
+animals. Install it with `remotes::install_github("jakebrownscombe/arraydesignR")` and start it with
+`arraydesignR::run_app()`.

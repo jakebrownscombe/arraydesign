@@ -1,0 +1,100 @@
+# R CMD check on three operating systems with release R, once on Ubuntu with
+# only the hard dependencies installed, and the full test suite on Ubuntu
+# with testthat::test_local(). That job runs the nine tests R CMD check
+# skips: the seven marked skip_on_cran(), among them the glatos oracle and
+# the run of the slow design-an-array script, and the two that need the
+# vignette sources beside the tests, which check that each vignette has a
+# script and that each script matches its source.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+name: R-CMD-check.yaml
+
+permissions: read-all
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: macos-latest, r: 'release'}
+          - {os: windows-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'release'}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      NOT_CRAN: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+          extra-repositories: https://ocean-tracking-network.r-universe.dev
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # detfield is not on CRAN; the Remotes field of DESCRIPTION names its
+          # GitHub repository, and this step resolves it from there.
+          extra-packages: any::rcmdcheck
+          needs: check
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
+
+  hard-dependencies-only:
+    # Plain R CMD build and check. The action installs the hard dependencies
+    # and its own two tools, pak and sessioninfo. Of the nine Suggests, scales
+    # and sf are installed because ggplot2 and detfield import them; the other
+    # seven are not. Vignettes are skipped because knitr is in Suggests.
+    runs-on: ubuntu-latest
+    name: ubuntu-latest (release, hard dependencies only)
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      _R_CHECK_FORCE_SUGGESTS_: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # detfield is not on CRAN; the Remotes field of DESCRIPTION names its
+          # GitHub repository, and this step resolves it from there.
+          dependencies: '"hard"'
+      - name: Build and check with the hard dependencies only
+        shell: bash
+        run: |
+          R CMD build --no-build-vignettes --no-manual .
+          R CMD check --no-manual --ignore-vignettes arraydesign_*.tar.gz
+          grep '^Status:' arraydesign.Rcheck/00check.log
+          ! grep -Eq '^Status:.*(ERROR|WARNING)' arraydesign.Rcheck/00check.log
+
+  test-local:
+    runs-on: ubuntu-latest
+    name: ubuntu-latest (release, testthat::test_local)
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+          extra-repositories: https://ocean-tracking-network.r-universe.dev
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgload
+          needs: check
+      - name: Run every test from the source tree
+        shell: Rscript {0}
+        run: testthat::test_local(".", stop_on_failure = TRUE)

@@ -1,0 +1,48 @@
+Package: arraydesign
+Title: Acoustic Receiver Array Design and Track Simulation
+Version: 0.1.1
+Authors@R:
+    person("Jacob", "Brownscombe", , "jakebrownscombe@gmail.com", role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0003-2496-8764"))
+Description: Places acoustic receivers on a depth raster, simulates animal
+    tracks as a correlated random walk that stays in water, simulates tag
+    transmissions with a random delay along the tracks, and simulates their
+    detection by the array. Detection probabilities come from the
+    detection-efficiency fields of 'detfield', so the simulated transmissions
+    are heard under the model that will analyse the data the array collects.
+    Scores a candidate array by positioning the simulated animals with
+    'detfield' and comparing the location surfaces with the true positions,
+    and reports the share of the water the array covers.
+License: GPL (>= 3)
+URL: https://jakebrownscombe.github.io/arraydesign/, https://github.com/jakebrownscombe/arraydesign
+BugReports: https://github.com/jakebrownscombe/arraydesign/issues
+Depends:
+    R (>= 4.1.0)
+Imports:
+    data.table,
+    detfield (>= 0.1.1),
+    ggplot2 (>= 3.5.0),
+    grDevices,
+    stats,
+    terra,
+    utils,
+    withr
+Suggests:
+    glatos (>= 0.9.8),
+    knitr,
+    png,
+    raster,
+    rmarkdown,
+    scales,
+    sf,
+    survival,
+    testthat (>= 3.0.0)
+Additional_repositories: https://ocean-tracking-network.r-universe.dev
+Remotes:
+    jakebrownscombe/detfield
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Encoding: UTF-8
+Language: en-GB
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1

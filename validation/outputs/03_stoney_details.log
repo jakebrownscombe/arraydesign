@@ -1,0 +1,68 @@
+arraydesign 0.1.1 ; detfield 0.1.1 ; R version 4.2.1 (2022-06-23) 
+water cells: 4818 ; receivers: 20 
+           case n_animals n_animal_hours n_bins scored_share hit_rate
+1 reference run        16            120     77       0.6417   0.5474
+  hit_rate_se median_error_mean_m
+1     0.02765               393.9
+          case n_animals n_animal_hours n_bins scored_share hit_rate
+1        still       150           4800   2669       0.5560   0.9577
+2      6 m/min       150           4800   2514       0.5238   0.8858
+3 default walk       185           4800   2980       0.6208   0.5457
+  hit_rate_se median_error_mean_m
+1    0.004423               384.6
+2    0.004817               377.8
+3    0.005889               413.2
+  receivers         case n_animals n_animal_hours n_bins scored_share hit_rate
+1         1        still         1            720      2     0.002778   1.0000
+2         1 default walk         5            720      7     0.009722   0.6368
+3         5        still        12            720     95     0.131944   0.9789
+4         5 default walk        30            720    123     0.170833   0.4987
+5        10        still        28            720    204     0.283333   0.9412
+6        10 default walk        44            720    220     0.305556   0.5504
+7        20        still        42            720    354     0.491667   0.9661
+8        20 default walk        52            720    447     0.620833   0.5614
+  hit_rate_se median_error_mean_m
+1          NA               622.3
+2    0.078005               617.5
+3    0.014404               314.7
+4    0.021303               415.8
+5    0.022507               425.2
+6    0.018401               465.0
+7    0.009932               339.2
+8    0.014268               407.6
+           case runs replicate_mean replicate_sd mean_se miss
+1 binomial, 6 h   40         0.5515      0.03073 0.03475    0
+2  sigma 1, 6 h   40         0.7545      0.03062 0.03226    1
+3 sigma 1, 24 h   20         0.7498      0.01438 0.01763    0
+host: Darwin arm64 16 cores 
+  station_hour runs median_s  max_s
+1           NA   10   3.2800  3.363
+2         2.55   10  11.1875 12.771
+R version 4.2.1 (2022-06-23)
+Platform: aarch64-apple-darwin20 (64-bit)
+Running under: macOS 15.7.7
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRlapack.dylib
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] detfield_0.1.1    arraydesign_0.1.1
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.1.2          magrittr_2.0.4      tidyselect_1.2.1   
+ [4] R6_2.6.1            rlang_1.1.3         dplyr_1.1.4        
+ [7] tools_4.2.1         parallel_4.2.1      dichromat_2.0-0.1  
+[10] grid_4.2.1          data.table_1.18.2.1 gtable_0.3.6       
+[13] terra_1.7-78        cli_3.6.5           withr_3.0.2        
+[16] tibble_3.3.1        lifecycle_1.0.5     S7_0.2.1           
+[19] RColorBrewer_1.1-3  farver_2.1.2        ggplot2_4.0.2      
+[22] vctrs_0.6.5         codetools_0.2-18    glue_1.8.0         
+[25] compiler_4.2.1      pillar_1.11.1       generics_0.1.4     
+[28] scales_1.4.0        pkgconfig_2.0.3    

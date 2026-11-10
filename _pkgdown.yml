@@ -1,0 +1,120 @@
+url: https://jakebrownscombe.github.io/arraydesign/
+
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+  bslib:
+    primary: "#2C5AA0"
+    base_font: {google: "Source Sans 3"}
+    heading_font: {google: "Source Sans 3"}
+    code_font: {google: "Source Code Pro"}
+
+# No link may leave the site for a page that does not resolve. The GitHub
+# navbar link is kept, since it points at the repository; pkgdown's source links
+# on each page and the sidebar's "Browse source code" and "Report a bug" are
+# left out by giving the repo only its home and by replacing the sidebar's
+# links section.
+repo:
+  url:
+    home: https://github.com/jakebrownscombe/arraydesign/
+
+# Examples on the reference pages print at 76 columns, as the articles do,
+# since the "#> " prefix adds three.
+code:
+  width: 76
+
+home:
+  title: "arraydesign: Acoustic Receiver Array Design and Track Simulation"
+  sidebar:
+    structure: [links, license, citation, authors, dev]
+    components:
+      links:
+        title: Links
+        text: >
+          [detqc](https://jakebrownscombe.github.io/detqc/),
+          [detfield](https://jakebrownscombe.github.io/detfield/) and
+          [arraydesignR](https://jakebrownscombe.github.io/arraydesignR/), the other
+          packages of positionR.
+
+navbar:
+  structure:
+    left: [intro, articles, reference, news]
+    right: [suite, search, github]
+  components:
+    intro:
+      text: Get started
+      href: articles/arraydesign.html
+    suite:
+      text: positionR
+      menu:
+        - text: positionR, the suite
+          href: https://jakebrownscombe.github.io/positionR/
+        - text: detqc, read, check and filter detections
+          href: https://jakebrownscombe.github.io/detqc/
+        - text: detfield, detection fields and positions
+          href: https://jakebrownscombe.github.io/detfield/
+        - text: arraydesign, design and test tracking systems
+          href: https://jakebrownscombe.github.io/arraydesign/
+        - text: arraydesignR, arraydesign as a point-and-click application
+          href: https://jakebrownscombe.github.io/arraydesignR/
+
+articles:
+  - title: Get started
+    navbar: Get started
+    desc: >
+      A 20-receiver array on Stoney Lake, its coverage map, simulated animals
+      and their detections, and the positioning error of each animal-hour.
+    contents:
+      - arraydesign
+  - title: Your own files
+    navbar: Your own files
+    desc: >
+      Your own depth raster, station lists and range model: candidate arrays
+      scored side by side on coverage, detection and positioning error, and a
+      station sheet for the field crew.
+    contents:
+      - design-an-array
+  - title: Movement
+    navbar: Movement
+    desc: >
+      A walk set for your species, with the start, start time and goal of
+      each animal.
+    contents:
+      - movement-models
+  - title: Detection and scoring
+    navbar: Detection and scoring
+    desc: >
+      Each step of a simulation as a table you can inspect or change, from
+      tracks to location surfaces and their scores.
+    contents:
+      - simulate-detections
+
+reference:
+  - title: Design an array
+    desc: >
+      Place receivers on a depth raster, map the share of water they cover,
+      and score the layout by the positioning error of simulated animals.
+    contents:
+      - place_receivers
+      - plot.receiver_layout
+      - coverage_summary
+      - evaluate_array
+      - plot.array_evaluation
+      - score_surfaces
+      - perturb_de_model
+  - title: Simulate tracks and detections
+    desc: >
+      Walk animals through the water, with a preference for a habitat layer
+      if you give one, send transmissions along their tracks, and hear them
+      through the detection field.
+    contents:
+      - movement_model
+      - crw_model
+      - habitat_selection
+      - track_control
+      - simulate_tracks
+      - available_steps
+      - plot.sim_tracks
+      - scale_colour_tracks
+      - simulate_transmissions
+      - simulate_detections

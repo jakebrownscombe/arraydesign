@@ -1,0 +1,162 @@
+terra 1.7.78
+Warning message:
+package 'terra' was built under R version 4.2.3 
+Linking to GEOS 3.11.0, GDAL 3.5.3, PROJ 9.1.0; sf_use_s2() is TRUE
+Warning message:
+package 'sf' was built under R version 4.2.3 
+arraydesign 0.1.1 ; R version 4.2.1 (2022-06-23) 
+  mean_step_m      land_test steps moving_segments positions_on_land
+1          30     whole step 20000           20000                 0
+2          30 end point only 20000           17845                 0
+3          60     whole step 20000           20000                 0
+4          60 end point only 20000           15614                 0
+5          90     whole step 20000           20000                 0
+6          90 end point only 20000           14567                 0
+  segments_crossing_land paths_in_far_basin of_paths
+1                      0                  0       20
+2                     39                 15       20
+3                      0                  0       20
+4                    180                 20       20
+5                      0                  0       20
+6                    221                 20       20
+Warning messages:
+1: Raster pixels are placed at uneven horizontal intervals and will be shifted
+i Consider using `geom_tile()` instead. 
+2: Raster pixels are placed at uneven horizontal intervals and will be shifted
+i Consider using `geom_tile()` instead. 
+null device 
+          1 
+KS steps: D = 0.0036, p = 0.986, 18707 steps of 20000 starting > 200 m from shore
+KS turns: D = 0.0039, p = 0.969, 18627 turns
+                      where  turns share_over_90
+1                       all 399980    0.02327616
+2       within 60 m of land  86236    0.09749988
+3 more than 200 m from land 159004    0.00295590
+model: 0.27% of 1e6 turn draws exceed 90 degrees
+dwell: move 19.90 steps (678 runs; configured 20), rest 9.61 (677 runs; configured 10)
+       delay transmissions track_hours per_hour expected
+1  60 to 180         28827        1000   28.827 28.80000
+2 120 to 240         19453        1000   19.453 19.45946
+3   30 to 90         55384        1000   55.384 55.38462
+               band pairs      mean_p covered_of_200
+[0,100)     [0,100)  2039 0.857318503            194
+[100,200) [100,200)  5153 0.717520229            196
+[200,300) [200,300)  8272 0.499345677            195
+[300,400) [300,400)  9214 0.277791851            192
+[400,500) [400,500)  9953 0.123419444            194
+[500,600) [500,600) 10219 0.049114220            186
+[600,700) [600,700) 12147 0.019003223            190
+[700,800) [700,800) 11868 0.006983835            188
+[800,900) [800,900) 11200 0.002654632            189
+[900,Inf) [900,Inf) 35165 0.000354459            196
+binomial 95% interval held the true rate in 1920 of 2000 band-seeds (96.0%)
+       band pairs_glatos rate_glatos pairs_arraydesign rate_arraydesign
+1   [0,100)          332     0.85241               457         0.866521
+2 [100,200)         1122     0.73975              1293         0.711524
+3 [200,300)         1958     0.47549              1974         0.487335
+4 [300,400)         2136     0.26873              2388         0.268844
+5 [400,500)         2298     0.12576              2473         0.121715
+6 [500,600)         2146     0.05452              2634         0.051632
+7 [600,700)         2415     0.02153              2707         0.014777
+8 [700,800)         2894     0.00760              2906         0.005850
+9 [800,Inf)        13577     0.00081             11986         0.000751
+   diff_lo diff_hi agree
+1 -0.08382 0.05560  TRUE
+2 -0.02217 0.07862  TRUE
+3 -0.05604 0.03234  TRUE
+4 -0.03673 0.03649  TRUE
+5 -0.02242 0.03051  TRUE
+6 -0.01521 0.02099  TRUE
+7 -0.00366 0.01717  TRUE
+8 -0.00420 0.00770  TRUE
+9 -0.00091 0.00103  TRUE
+transmissions: glatos 4813, arraydesign 4803 over 166.667 track-hours each
+Stoney grid: 421 x 560 cells, 46097 water
+Stoney raster values (stored): 0.1 32.67172 
+Stoney depth: 12125 of 46097 water cells (26.3%) are 1 m deep or less
+    n grid grid_trimmed grid_on_land random random_on_land grid_at_1m_or_less
+1   5    5            0            0      5              0                  1
+2  48   48            0            0     48              0                 10
+3  50   50            0            0     50              0                 15
+4 200  200            0            0    200              0                 44
+  random_at_1m_or_less masked_grid masked_under_1m seconds
+1                    1           5               0    0.05
+2                    7          48               0    0.05
+3                    7          50               0    0.04
+4                   46         200               0    0.05
+  mean_step_m steps seconds positions_on_land segments_crossing_land reflected
+1          50 20000     0.5                 0                      0      1227
+2          90 20000     0.6                 0                      0      2180
+  held
+1    2
+2   18
+                             walk     band water_cells water_share
+1  example_lake, crw(30, 10, Inf)  <= 42 m         240       0.112
+2  example_lake, crw(30, 10, Inf)  42-90 m         446       0.207
+3  example_lake, crw(30, 10, Inf) 90-150 m         414       0.192
+4  example_lake, crw(30, 10, Inf)  > 150 m        1052       0.489
+5   example_lake, crw(30, 10, 30)  <= 42 m         240       0.112
+6   example_lake, crw(30, 10, 30)  42-90 m         446       0.207
+7   example_lake, crw(30, 10, 30) 90-150 m         414       0.192
+8   example_lake, crw(30, 10, 30)  > 150 m        1052       0.489
+9         Stoney, crw(30, 10, 30)  <= 42 m        8127       0.176
+10        Stoney, crw(30, 10, 30)  42-90 m        8361       0.181
+11        Stoney, crw(30, 10, 30) 90-150 m        8643       0.187
+12        Stoney, crw(30, 10, 30)  > 150 m       20966       0.455
+13        Stoney, crw(90, 30, 30)  <= 42 m        8127       0.176
+14        Stoney, crw(90, 30, 30)  42-90 m        8361       0.181
+15        Stoney, crw(90, 30, 30) 90-150 m        8643       0.187
+16        Stoney, crw(90, 30, 30)  > 150 m       20966       0.455
+   position_share       se ratio       z positions reflected held  steps
+1           0.108 0.002469 0.972 -1.2652    560000     21405    0 616000
+2           0.201 0.004257 0.971 -1.4239    560000     21405    0 616000
+3           0.188 0.002739 0.979 -1.4507    560000     21405    0 616000
+4           0.502 0.008541 1.027  1.5408    560000     21405    0 616000
+5           0.113 0.000621 1.012  2.1066    560000     22239    0 616000
+6           0.207 0.001200 0.999 -0.1629    560000     22239    0 616000
+7           0.193 0.000779 1.003  0.7514    560000     22239    0 616000
+8           0.487 0.001919 0.997 -0.8847    560000     22239    0 616000
+9           0.176 0.010317 0.996 -0.0722    560000     30588    4 616000
+10          0.175 0.007323 0.964 -0.8992    560000     30588    4 616000
+11          0.177 0.004829 0.946 -2.0926    560000     30588    4 616000
+12          0.472 0.020943 1.038  0.8325    560000     30588    4 616000
+13          0.183 0.004434 1.039  1.5546    560000     82300  843 616000
+14          0.187 0.003124 1.031  1.7988    560000     82300  843 616000
+15          0.191 0.002474 1.017  1.2647    560000     82300  843 616000
+16          0.439 0.008896 0.966 -1.7583    560000     82300  843 616000
+null device 
+          1 
+R version 4.2.1 (2022-06-23)
+Platform: aarch64-apple-darwin20 (64-bit)
+Running under: macOS 15.7.7
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRlapack.dylib
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] sf_1.0-16         terra_1.7-78      arraydesign_0.1.1
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.1.2          cellranger_1.1.0    pillar_1.11.1      
+ [4] compiler_4.2.1      RColorBrewer_1.1-3  class_7.3-20       
+ [7] tools_4.2.1         timechange_0.4.0    lubridate_1.9.5    
+[10] lifecycle_1.0.5     tibble_3.3.1        gtable_0.3.6       
+[13] lattice_0.20-45     pkgconfig_2.0.3     rlang_1.1.3        
+[16] DBI_1.3.0           cli_3.6.5           parallel_4.2.1     
+[19] e1071_1.7-17        withr_3.0.2         dplyr_1.1.4        
+[22] raster_3.6-26       generics_0.1.4      vctrs_0.6.5        
+[25] nanoparquet_0.4.2   classInt_0.4-10     grid_4.2.1         
+[28] tidyselect_1.2.1    data.table_1.18.2.1 glue_1.8.0         
+[31] R6_2.6.1            readxl_1.4.3        otel_0.2.0         
+[34] sp_2.2-1            ggplot2_4.0.2       farver_2.1.2       
+[37] magrittr_2.0.4      glatos_0.9.8        scales_1.4.0       
+[40] codetools_0.2-18    units_0.8-5         detfield_0.1.1     
+[43] dichromat_2.0-0.1   labeling_0.4.3      S7_0.2.1           
+[46] KernSmooth_2.23-20  proxy_0.4-29       

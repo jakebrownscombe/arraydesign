@@ -1,0 +1,324 @@
+---
+title: "Design and test an array for Stoney Lake"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Design and test an array for Stoney Lake}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE, purl = FALSE}
+options(width = 76)
+# A figure whose pixels are all opaque is written without its alpha channel:
+# the same pixels in a smaller file.
+opaque_png <- function(path) {
+  x <- png::readPNG(path)
+  if (length(dim(x)) == 3 && dim(x)[3] == 4 && all(x[, , 4] == 1)) {
+    png::writePNG(x[, , 1:3], path)
+  }
+  path
+}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 4.6, out.width = "100%", dpi = 117,
+                      fig.process = if (requireNamespace("png", quietly = TRUE)) opaque_png)
+```
+
+**arraydesign** designs acoustic receiver arrays and tests how well a tracking system performs,
+for a new study or for refining or auditing an array already in the water. It places receivers
+on a depth raster, maps the share of the water they hear, walks simulated animals through it,
+and scores the positions estimated from their detections against the true tracks. This page
+runs it end to end on a 20-receiver array on Stoney Lake, Ontario, the example data
+included with the package.
+
+Three articles demonstrate further functionality. [Design an array for your own water
+body](design-an-array.html) starts from your own raster, station lists and range test, compares
+candidate layouts and writes the stations for the field crew. [Specifying and testing movement
+models](movement-models.html) sets the walk for your species, a behaviour switching model
+between moving and resting, and a goal-oriented model with start and end points.
+[Simulate and score an array step by step](simulate-detections.html) runs each stage of
+`evaluate_array()` on its own, as a table you can inspect or change.
+
+## 1. Place receivers on Stoney Lake
+
+The depth raster is Stoney Lake at 100 m resolution, with land as `NA`. Depth is zero or
+negative metres; 56 of its 4,818 water cells hold 0. It has the same grid and depths as
+`depth_raster` of positionR 1.7.0, with the CRS set to EPSG:32617. `terra::rast()` reads it;
+the print gives its extent, resolution and depth range.
+
+```{r read-lake}
+# Load the package, and ggplot2 for the maps
+library(arraydesign)
+library(ggplot2)
+
+# Read the depth raster included with the package
+lake <- terra::rast(system.file("extdata", "stoney_depth.tif",
+                                package = "arraydesign"))
+lake
+```
+
+Receivers go in water at least 1 m deep. `terra::ifel()` sets the shallower cells to `NA`, and
+`place_receivers()` lays a regular grid of 20 receivers over the rest. It returns their
+projected coordinates, their latitude and longitude for the field crew, and the depth under
+each (`deploy_z`). It also places random arrays (`method = "random"`) and stations you have
+planned (`method = "manual"`).
+
+```{r place-on-raster}
+# Set water shallower than 1 m to NA, so that no receiver goes there
+deployable <- terra::ifel(abs(lake) < 1, NA, lake)
+
+# Lay a grid of 20 receivers over the deployable water
+receivers <- place_receivers(deployable, n = 20, method = "grid", seed = 1)
+head(receivers)
+
+# Print the depth range under the receivers, m
+range(receivers$deploy_z)
+```
+
+The receivers sit in `r sprintf("%.1f", min(receivers$deploy_z))` to
+`r sprintf("%.1f", max(receivers$deploy_z))` m of water. `plot()` draws the layout on its lake.
+
+```{r place-receivers, fig.height = 4.6, fig.alt = "The 20 receivers of the grid on Stoney Lake as yellow rings with their names, over the lake drawn by depth."}
+# Map the layout over the lake
+plot(receivers, lake)
+```
+
+*The 20 receivers of the grid on Stoney Lake.*
+
+## 2. Build the detection field and map coverage
+
+The range model gives the probability that a receiver hears one transmission at a given
+distance and receiver depth. The
+[**detfield**](https://jakebrownscombe.github.io/detfield/) R package, which builds detection
+fields and positions animals, sets it in one of two ways. `detfield::de_model()` wraps a model
+you fitted to your own range-test data, and `detfield::de_logistic()` makes a stand-in curve
+from two distances for a study with no range test; neither estimates a model from range-test
+data for you. The example uses the stand-in and assumes all of its values: no range test
+measured them, and the range test included with **detfield** is simulated from them. It takes the distances at which 50% and 5% of transmissions are heard (`d50`, `d05`) to be 250 m and 500 m
+for a receiver 1 m deep and 750 m and 1,500 m at 35 m, interpolated between. [Design an array
+for your own water body](design-an-array.html#the-range-model-yours-or-the-default) takes a
+model fitted to your own range test.
+
+```{r range-model}
+# Set the assumed range model: d50 and d05 for receivers 1 m and 35 m deep
+range_model <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
+                                     depth = c(1, 35))
+range_model
+```
+
+**detfield** measures the distance through water from each receiver to each water cell and
+reads the curve there, so a receiver does not hear across a point of land.
+`detfield::de_field()` returns the detection field, one probability per receiver and cell.
+
+```{r detection-field-build}
+# Measure the distance through water from each receiver to each water cell
+distances <- detfield::water_distances(lake, receivers)
+
+# Read the curve at each distance: one probability per receiver and cell
+field <- detfield::de_field(distances, range_model)
+```
+
+The message from `de_field()` counts the receiver and cell pairs with `p >= 0.05` that have land
+on the straight line between them. A curve from `de_logistic()` reads a pair with land on the
+line at the distance through water; `blocked` in `?detfield::de_model` sets how much less
+such pairs hear.
+
+`coverage_summary()` counts, at each threshold, the cells that at least one receiver hears on its
+own (`n_cells`).
+
+```{r coverage-summary}
+# Count the cells one receiver alone hears at p >= 0.5 and p >= 0.8
+coverage_summary(field)
+```
+
+The array as a whole hears a cell when any receiver hears the transmission, which takes in cells
+between receivers that no single one reaches. The chance that one or more receivers hear it is
+one minus the product of the misses (Pedersen et al. 2014, *Methods in Ecology and Evolution*
+5: 1043-1051, DOI 10.1111/2041-210X.12255).
+
+```{r array-probability}
+# Compute the chance that one or more receivers hear, per water cell
+array_p <- data.frame(p = 1 - apply(1 - field$p, 1, prod),
+                      terra::xyFromCell(lake, field$cells))
+
+# Count the cells at p >= 0.5 under the array, and all water cells
+c(cells_at_0.5 = sum(array_p$p >= 0.5), water_cells = nrow(array_p))
+```
+
+The array hears `r format(sum(array_p$p >= 0.5), big.mark = ",")` cells
+(`r sprintf("%.1f%%", 100 * mean(array_p$p >= 0.5))` of the water) at 0.5 or more, against
+`r coverage_summary(field)$n_cells[1]` under one receiver alone. Most of the lake lies outside
+the 50% range of every receiver, so the array hears animals as they pass.
+
+```{r detection-field, fig.height = 4.2, fig.alt = "Detection probability on Stoney Lake under the 20 receivers: bright patches round each yellow ring, most of the lake dark."}
+# Take the ring colours of the positionR maps
+ring <- detfield::positionr_ring_colours()
+
+# Map the array's detection probability, with the receivers on top as a dark
+# ring under a coloured one; the shape scale keys them
+ggplot(array_p, aes(x, y)) +
+  geom_raster(aes(fill = p)) +
+  detfield::scale_fill_probability(name = "Detection\nprobability") +
+  geom_point(data = receivers, aes(shape = "Receiver"), colour = ring[["edge"]],
+             size = 1.3, stroke = 0.9) +
+  geom_point(data = receivers, aes(shape = "Receiver"), colour = ring[["heard"]],
+             size = 1.3, stroke = 0.45) +
+  scale_shape_manual(name = NULL, values = c(Receiver = 21)) +
+  coord_equal(expand = FALSE) +
+  labs(x = "Easting (m)", y = "Northing (m)") +
+  detfield::annotation_scale_bar(location = "br") +
+  detfield::theme_positionr()
+```
+
+*Probability that at least one of the 20 receivers hears one transmission from
+each of the `r format(nrow(array_p), big.mark = ",")` water cells of Stoney Lake, 100 m on a
+side.*
+
+## 3. Set a movement model
+
+`crw_model()` builds a correlated random walk from a mean and standard deviation of step length
+per time step and a standard deviation of the turning angle. The walk here moves 30 m a minute
+with turns of standard deviation 40 degrees; no species was measured to set these values.
+[Specifying and testing movement models](movement-models.html) sets a walk for your species, a
+switch between moving and resting, release points and a goal.
+
+```{r movement-walk}
+# Build a correlated random walk: gamma steps, wrapped normal turns,
+# 60 s a step
+walk <- crw_model(step_mean = 30, step_sd = 15, turn_sd = 40, time_step_s = 60)
+walk
+```
+
+## 4. Simulate animals and their detections
+
+`evaluate_array()` walks the animals from random water cells, sends their tags' transmissions
+at a random delay of 120 to 180 s, gives each receiver one chance to hear each transmission at
+the probability of the field, and
+positions the animals from what was heard. This is the reference run of the
+[**arraydesignR**](https://jakebrownscombe.github.io/arraydesignR/) R package, the
+point-and-click application of **arraydesign**: 20 animals for 6 hours.
+[Simulate and score an array step by step](simulate-detections.html) runs each of these stages
+on its own. The delay is a setting, the `tag_delay` element of `control`: its default is 65 to
+185 s, a tag programmed at 60 to 180 s with a 5 s transmission, and this page sets it to 120 to
+180 s. Give the delay of your own tags, one number or the shortest and longest, in seconds.
+
+```{r evaluate}
+# Simulate 20 animals for 6 hours, detect, position and score them
+evaluation <- evaluate_array(receivers, lake, range_model, n_animals = 20,
+                             seed = 1,
+                             control = list(hours = 6, tag_delay = c(120, 180),
+                                            movement = walk))
+evaluation
+```
+
+The detection rate of an animal is the share of its transmissions heard by at least one
+receiver.
+
+```{r detection-rate}
+# Take the transmissions, with the number of receivers that heard each
+sent <- evaluation$detections$transmissions
+
+# Compute the share of each animal's transmissions heard by any receiver
+rate_per_animal <- tapply(sent$n_detections > 0, sent$path_id, mean)
+c(mean = mean(rate_per_animal), median = median(rate_per_animal),
+  never_heard = sum(rate_per_animal == 0))
+```
+
+`r sum(sent$n_detections > 0)` transmissions were heard. The mean detection rate per animal is
+`r sprintf("%.1f%%", 100 * mean(rate_per_animal))`, and `r sum(rate_per_animal == 0)` of the 20
+animals were never heard. Counting the detections of each receiver separates the receivers
+that heard the animals from those that heard none.
+
+```{r receiver-detections}
+# Count the detections of each receiver; a receiver that heard none counts 0
+heard_at <- evaluation$detections$detections$receiver_serial
+receiver_counts <- data.frame(
+  station_id = receivers$station_id, x = receivers$x, y = receivers$y,
+  detections = as.vector(table(factor(heard_at,
+                                      levels = receivers$receiver_serial)))
+)
+
+# List the stations that heard none of the animals
+receiver_counts$station_id[receiver_counts$detections == 0]
+```
+
+The receivers that heard none lie in the middle of the lake, where no track came within range
+in the six hours; the heard transmissions cluster round the rest.
+
+```{r simulate-animals, fig.height = 4.6, fig.alt = "Pale grey tracks of 20 animals on Stoney Lake from white start points, green points where a transmission was heard and small red crosses where it was not, with yellow rings sized by detections and white rings for the receivers that heard nothing."}
+# Take the water cells, with depth as positive metres
+water <- terra::as.data.frame(abs(lake), xy = TRUE, na.rm = TRUE)
+names(water)[3] <- "depth_m"
+
+# Take the first position of each track, its start
+tracks_table <- as.data.frame(evaluation$tracks)
+starts <- tracks_table[!duplicated(tracks_table$path_id), ]
+
+# Map the water, the tracks, the misses, the heard transmissions, the starts
+# and the receivers, in that order; the colour scale keys the marks
+ggplot(tracks_table, aes(x, y)) +
+  geom_raster(data = water, aes(fill = depth_m)) +
+  detfield::scale_fill_depth() +
+  geom_path(aes(group = path_id, colour = "Track"), linewidth = 1.1) +
+  geom_point(data = sent[sent$n_detections == 0, ], aes(colour = "Not heard"),
+             shape = 4, size = 0.35, stroke = 0.25, alpha = 0.7) +
+  geom_point(data = sent[sent$n_detections > 0, ], aes(colour = "Heard"),
+             shape = 21, fill = "#2ECC40", size = 1.7, stroke = 0.3) +
+  geom_point(data = starts, aes(colour = "Start"), shape = 21, fill = "white",
+             size = 1.8, stroke = 0.5) +
+  scale_colour_manual(
+    name = NULL, breaks = c("Track", "Start", "Heard", "Not heard"),
+    values = c(Track = "grey85", Start = "black", Heard = "black",
+               `Not heard` = "red3"),
+    # The key draws the cross larger than the map does, so that it reads
+    guide = guide_legend(position = "bottom",
+                         override.aes = list(size = c(1, 1.8, 1.7, 1.6),
+                                             stroke = c(0.5, 0.5, 0.3, 0.6),
+                                             alpha = 1))
+  ) +
+  detfield::layer_receivers(receiver_counts, count = "detections",
+                            size = 3.4) +
+  coord_equal(expand = FALSE) +
+  labs(x = "Easting (m)", y = "Northing (m)") +
+  detfield::annotation_scale_bar(location = "br") +
+  detfield::theme_positionr()
+```
+
+*Tracks of the 20 simulated animals over 6 hours, from their starts, and their
+`r format(nrow(sent), big.mark = ",")` transmissions, heard by at least one receiver or not.
+Of the 20 receivers, `r sum(receiver_counts$detections > 0)`
+heard at least one transmission and `r sum(receiver_counts$detections == 0)` heard none.*
+
+## 5. Score positions
+
+For each animal-hour with a detection, `evaluate_array()` counts the detections per receiver
+with `detfield::bin_detections()`, computes a location surface with
+`detfield::location_surface()`, and measures the distance from the surface's mean to the
+animal's mean true position in the hour. The location surface is the positioning method of
+**detfield**: for one animal and one hour, the likelihood of each listening receiver's count of
+detections over the water cells, under a flat prior and normalised to sum to one; by default the
+binomial likelihood, which uses the detections and the misses (`?detfield::location_surface`;
+[the model](https://jakebrownscombe.github.io/detfield/articles/positioning.html)). A study may position its
+animals by another method from the same detection set; the
+[**detqc**](https://jakebrownscombe.github.io/detqc/) R package writes it in the forms the glatos
+and actel R packages and the trackyverse ATO read (`detqc::to_glatos()`, `detqc::to_actel()` and
+`detqc::to_ato()`). The hit rate is the mean,
+over animal-hours, of the share of the hour's true positions that fall inside the surface's 95%
+region.
+
+Only an animal-hour with a detection can be positioned with a location surface, here a share of
+`r sprintf("%.3f", evaluation$score$overall$scored_share)` of the
+`r evaluation$score$overall$n_animal_hours` animal-hours, and the median error of those scored
+is `r round(evaluation$score$overall$median_error_mean_m)` m. The hit rate,
+`r sprintf("%.3f", evaluation$score$overall$hit_rate)`, is below 0.95 because a surface assumes
+the animal stayed in one place for the hour, and these animals swim about
+`r sprintf("%.1f", 30 * 60 / 1000)` km in an hour. `plot()` maps the error of each scored
+animal-hour.
+
+```{r evaluate-array, fig.height = 4.6, fig.alt = "Points at the true positions of the scored animal-hours on Stoney Lake, coloured by positioning error in four classes, with yellow rings for the receivers that heard the animals and white rings for those that heard none."}
+# Map the positioning error of each scored animal-hour
+plot(evaluation)
+```
+
+*Positioning error of each of the `r evaluation$score$overall$n_bins` scored animal-hours: the
+distance from the mean of the hourly location surface to the animal's mean true position in the
+hour, drawn at that position.*

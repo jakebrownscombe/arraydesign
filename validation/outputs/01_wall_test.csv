@@ -1,0 +1,7 @@
+"mean_step_m","land_test","steps","moving_segments","positions_on_land","segments_crossing_land","paths_in_far_basin","of_paths"
+30,"whole step",20000,20000,0,0,0,20
+30,"end point only",20000,17845,0,39,15,20
+60,"whole step",20000,20000,0,0,0,20
+60,"end point only",20000,15614,0,180,20,20
+90,"whole step",20000,20000,0,0,0,20
+90,"end point only",20000,14567,0,221,20,20

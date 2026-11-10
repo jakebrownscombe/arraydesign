@@ -1,0 +1,8 @@
+arraydesign 0.1.1 ; R version 4.2.1 (2022-06-23) 
+water cells: 4818 ; release cells: 20 
+ beta n_animals steps_per_animal proposals accepted acceptance over_reach
+ -0.3        20             2880    112430    57600     0.5123          8
+  0.3        20             2880    147109    57600     0.3915         10
+ above_bound exhausted
+           0         0
+           0         0

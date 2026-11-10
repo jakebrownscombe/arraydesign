@@ -1,0 +1,159 @@
+arraydesign 0.1.1 ; detfield 0.1.1 ; R version 4.2.1 (2022-06-23) 
+water cells: 2152 ; receivers: 8 
+                      case n_animals n_bin_starts n_bins n_animal_hours
+1          binomial, exact       200           24   4800           4800
+2    station_hour 1, exact        60           24   1440           1440
+3 station_hour 2.55, exact        60           24   1439           1440
+  hit_rate hit_rate_se     hit_rate_se_from hit_rate_lo hit_rate_hi
+1   0.9504    0.003483    bin start (floor)      0.9432      0.9576
+2   0.9389    0.012497 animal and bin start      0.9130      0.9647
+3   0.9521    0.013991    bin start (floor)      0.9231      0.9810
+  hit_rate_se_animal       z mean_region_mass median_error_mean_m
+1           0.002974  0.1196           0.9520               55.05
+2           0.007174 -0.8891           0.9505              112.52
+3           0.004842  0.1465           0.9502              210.74
+  median_error_mode_m p90_error_mean_m median_area_m2
+1                60.0            113.6          36000
+2               123.7            218.6         136800
+3               218.4            406.6         455400
+                                        case n_animals n_bin_starts n_bins
+1              binomial, still, random delay       200           24   4800
+2       binomial, default walk, random delay       200           24   4800
+3            binomial, 6 m/min, random delay       200           24   4800
+4 station_hour 1, default walk, random delay        60           24   1440
+  n_animal_hours hit_rate hit_rate_se  hit_rate_se_from hit_rate_lo hit_rate_hi
+1           4800   0.9425    0.004246 bin start (floor)      0.9337      0.9513
+2           4800   0.2634    0.002560    animal (floor)      0.2581      0.2687
+3           4800   0.8285    0.003112    animal (floor)      0.8221      0.8349
+4           1440   0.6177    0.012316 bin start (floor)      0.5922      0.6431
+  hit_rate_se_animal        z mean_region_mass median_error_mean_m
+1           0.003243   -1.767           0.9519               58.67
+2           0.002560 -268.241           0.9517               79.80
+3           0.003112  -39.045           0.9518               56.77
+4           0.005588  -26.985           0.9504              119.92
+  median_error_mode_m p90_error_mean_m median_area_m2
+1               60.00            119.1          39600
+2               91.38            159.2          41400
+3               59.71            117.1          39600
+4              135.21            223.7         166500
+  receivers             case n_animals n_bin_starts n_bins n_animal_hours
+1         1            still        51           12    493            720
+2         1 default movement        59           12    468            720
+3         4            still        60           12    718            720
+4         4 default movement        60           12    720            720
+5         8            still        60           12    720            720
+6         8 default movement        60           12    720            720
+7        16            still        60           12    720            720
+8        16 default movement        60           12    720            720
+  hit_rate hit_rate_se     hit_rate_se_from hit_rate_lo hit_rate_hi
+1   0.9371    0.014369 animal and bin start      0.9055      0.9687
+2   0.6011    0.010763       animal (floor)      0.5774      0.6248
+3   0.9387    0.010935    bin start (floor)      0.9147      0.9628
+4   0.4324    0.010294    bin start (floor)      0.4097      0.4550
+5   0.9431    0.011507    bin start (floor)      0.9177      0.9684
+6   0.2719    0.007847 animal and bin start      0.2547      0.2892
+7   0.9681    0.006888       animal (floor)      0.9529      0.9832
+8   0.1639    0.006529    bin start (floor)      0.1495      0.1782
+  hit_rate_se_animal         z mean_region_mass median_error_mean_m
+1           0.011204   -0.8964           0.9503              350.51
+2           0.010763  -32.4141           0.9503              359.82
+3           0.008834   -1.0316           0.9508              125.30
+4           0.008009  -50.2829           0.9507              133.93
+5           0.008284   -0.6035           0.9521               53.97
+6           0.006768  -86.4069           0.9516               75.01
+7           0.006888    2.6214           0.9540               36.78
+8           0.004505 -120.4145           0.9531               50.48
+  median_error_mode_m p90_error_mean_m median_area_m2
+1              391.15            610.5         437400
+2              456.34            572.5         480600
+3               94.87            276.4         107100
+4              156.74            260.8         121050
+5               60.00            105.4          35100
+6               87.75            160.9          42300
+7               42.43             71.4          17100
+8               54.17            115.6          23400
+     1      4      8     16 
+0.3360 0.5063 0.6711 0.8042 
+           case runs bins_per_run df replicate_mean replicate_sd mean_se se_na
+1 binomial, 6 h   40          120  5         0.2581      0.01293 0.01727     0
+2  sigma 1, 6 h   40          120  5         0.6069      0.03090 0.03533     0
+3 sigma 1, 24 h   20          480 19         0.6118      0.01549 0.01715     0
+  miss_t miss_196
+1      0        0
+2      1        2
+3      0        0
+  d50_scale       case n_animals n_bin_starts n_bins n_animal_hours hit_rate
+1      0.50 d50 x 0.50       100           24   2400           2400 0.819167
+2      0.71 d50 x 0.71       100           24   2400           2400 0.889583
+3      1.00 d50 x 1.00       100           24   2400           2400 0.938333
+4      1.41 d50 x 1.41       100           24   2400           2400 0.427083
+5      2.00 d50 x 2.00       100           24   2400           2400 0.001667
+  hit_rate_se     hit_rate_se_from hit_rate_lo hit_rate_hi hit_rate_se_animal
+1    0.013721 animal and bin start      0.7908    0.847550           0.013298
+2    0.009185 animal and bin start      0.8706    0.908585           0.008752
+3    0.005633       animal (floor)      0.9267    0.949987           0.005633
+4    0.027609       animal (floor)      0.3700    0.484197           0.027609
+5    0.001139 animal and bin start      0.0000    0.004022           0.001012
+         z mean_region_mass median_error_mean_m median_error_mode_m
+1   -9.536           0.9516               84.21               84.85
+2   -6.577           0.9516               69.70               67.08
+3   -2.071           0.9519               53.43               60.00
+4  -18.940           0.9539               91.36               94.87
+5 -832.789           0.9726              249.70              256.32
+  p90_error_mean_m median_area_m2
+1            152.8          43200
+2            133.2          40500
+3            110.3          36900
+4            209.0          18900
+5            428.8           2700
+  sigma_position        case n_animals n_bin_starts n_bins n_animal_hours
+1          1.362 sigma 1.362        60           24   1437           1440
+2          2.550 sigma 2.550        60           24   1437           1440
+  hit_rate hit_rate_se     hit_rate_se_from hit_rate_lo hit_rate_hi
+1   0.7321     0.03976 animal and bin start      0.6498      0.8143
+2   0.9673     0.01033 animal and bin start      0.9459      0.9887
+  hit_rate_se_animal      z mean_region_mass median_error_mean_m
+1           0.015443 -5.481           0.9504               188.6
+2           0.004977  1.675           0.9502               193.0
+  median_error_mode_m p90_error_mean_m median_area_m2
+1               210.0            427.7         190800
+2               216.3            395.4         451800
+host: Darwin arm64 16 cores 
+  station_hour runs median_s max_s over_10_s
+1           NA   10   0.4175 0.496         0
+2         1.00   10   3.6975 4.034         0
+3         2.55   10   5.7515 6.222         0
+null device 
+          1 
+map: 120 animal-hours of 20 animals
+null device 
+          1 
+R version 4.2.1 (2022-06-23)
+Platform: aarch64-apple-darwin20 (64-bit)
+Running under: macOS 15.7.7
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRblas.0.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.2-arm64/Resources/lib/libRlapack.dylib
+
+locale:
+[1] C
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] detfield_0.1.1    arraydesign_0.1.1
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.1.2          magrittr_2.0.4      tidyselect_1.2.1   
+ [4] viridisLite_0.4.3   R6_2.6.1            rlang_1.1.3        
+ [7] dplyr_1.1.4         tools_4.2.1         parallel_4.2.1     
+[10] dichromat_2.0-0.1   grid_4.2.1          data.table_1.18.2.1
+[13] gtable_0.3.6        terra_1.7-78        cli_3.6.5          
+[16] withr_3.0.2         tibble_3.3.1        lifecycle_1.0.5    
+[19] S7_0.2.1            RColorBrewer_1.1-3  farver_2.1.2       
+[22] ggplot2_4.0.2       vctrs_0.6.5         codetools_0.2-18   
+[25] glue_1.8.0          labeling_0.4.3      compiler_4.2.1     
+[28] pillar_1.11.1       generics_0.1.4      scales_1.4.0       
+[31] pkgconfig_2.0.3    

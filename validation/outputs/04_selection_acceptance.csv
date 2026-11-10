@@ -1,0 +1,3 @@
+"beta","n_animals","steps_per_animal","proposals","accepted","acceptance","over_reach","above_bound","exhausted"
+-0.3,20,2880,112430,57600,0.5123,8,0,0
+0.3,20,2880,147109,57600,0.3915,10,0,0
