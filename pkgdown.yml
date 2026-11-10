@@ -1,0 +1,13 @@
+pandoc: '3.8'
+pkgdown: 2.0.9
+pkgdown_sha: ~
+articles:
+  arraydesign: arraydesign.html
+  design-an-array: design-an-array.html
+  movement-models: movement-models.html
+  simulate-detections: simulate-detections.html
+last_built: 2026-11-10T18:54Z
+urls:
+  reference: https://jakebrownscombe.github.io/arraydesign/reference
+  article: https://jakebrownscombe.github.io/arraydesign/articles
+
