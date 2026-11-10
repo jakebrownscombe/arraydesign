@@ -405,8 +405,10 @@ try(movement_model(
 ```
 
 Use `n_draws` in every draw. `evaluate_array()` also needs a whole number of steps in an hour,
-so the time step must divide 3600 s. To show the message, the next chunk sets up the 20-receiver
-grid and the assumed range model of [Get started](arraydesign.html), which section 6 also uses.
+so the time step must divide 3600 s. Choose a time step such as 60, 120, 180, 300 or 600 s, and give the step lengths for that time step.
+
+The next chunk sets up the 20-receiver grid and the assumed
+range model of [Get started](arraydesign.html), which section 6 uses.
 
 ```{r grid-array}
 # Lay the 20-receiver grid of Get started over water at least 1 m deep
@@ -417,21 +419,6 @@ receivers <- place_receivers(deployable, n = 20, method = "grid", seed = 1)
 range_model <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
                                      depth = c(1, 35))
 ```
-
-A walk with a step of seven minutes is refused:
-
-```{r time-step-error}
-# Build a walk with a time step of 420 s, which does not divide an hour
-seven_minutes <- crw_model(step_mean = 210, step_sd = 105, turn_sd = 40,
-                           time_step_s = 420)
-
-# Try to evaluate it; evaluate_array() refuses it and names the fix
-try(evaluate_array(receivers, lake, range_model,
-                   control = list(movement = seven_minutes)))
-```
-
-Choose a time step such as 60, 120, 180, 300 or 600 s, and give the step lengths for that time
-step.
 
 ## 4. Goal-oriented movement
 

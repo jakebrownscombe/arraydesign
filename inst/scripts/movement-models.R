@@ -182,15 +182,6 @@ receivers <- place_receivers(deployable, n = 20, method = "grid", seed = 1)
 range_model <- detfield::de_logistic(d50 = c(250, 750), d05 = c(500, 1500),
                                      depth = c(1, 35))
 
-# ---- Time step error ----
-# Build a walk with a time step of 420 s, which does not divide an hour
-seven_minutes <- crw_model(step_mean = 210, step_sd = 105, turn_sd = 40,
-                           time_step_s = 420)
-
-# Try to evaluate it; evaluate_array() refuses it and names the fix
-try(evaluate_array(receivers, lake, range_model,
-                   control = list(movement = seven_minutes)))
-
 # ---- Release and goal ----
 # Set a release point in the south-west arm and a goal on the north shore
 release <- data.frame(x = 721950, y = 4930450)
