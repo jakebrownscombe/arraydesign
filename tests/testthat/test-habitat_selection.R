@@ -78,7 +78,7 @@ test_that("a model without a preference gives the tracks of detfield's stoney_tr
   )
   expect_identical(nrow(tracks), nrow(ref))
   # Equal to floating-point tolerance: on the macOS CI runner the coordinates
-  # differed from the stored track by about 1e-11 m after step 776.
+  # differed from the stored track from step 777 on, by 1e-10 to 1e-9 m.
   expect_equal(tracks$x, ref$x)
   expect_equal(tracks$y, ref$y)
   expect_identical(tracks$time, ref$datetime)
