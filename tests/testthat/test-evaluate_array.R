@@ -198,6 +198,10 @@ test_that("print names the positioning model when it differs", {
 
 test_that("the defaults score the toy lake in a median under 10 s at Stoney's sigma", {
   skip_on_cran()
+  # The time is a claim about a laptop. Coverage instrumentation slows the code
+  # several-fold, and the shared CI runners are slower too: Windows took 31 s.
+  skip_on_covr()
+  skip_on_ci()
   # A median of three runs: a single run can come close to 10 s on a loaded machine.
   m <- detfield::de_model(logistic, sigma = list(station_hour = 2.55))
   elapsed <- vapply(1:3, function(i) {

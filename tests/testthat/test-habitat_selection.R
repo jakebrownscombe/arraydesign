@@ -77,8 +77,10 @@ test_that("a model without a preference gives the tracks of detfield's stoney_tr
     control = track_control(start_time = as.POSIXct("2024-06-01", tz = "UTC")), seed = 1L
   )
   expect_identical(nrow(tracks), nrow(ref))
-  expect_identical(tracks$x, ref$x)
-  expect_identical(tracks$y, ref$y)
+  # Equal to floating-point tolerance: on the macOS CI runner the coordinates
+  # differed from the stored track by about 1e-11 m after step 776.
+  expect_equal(tracks$x, ref$x)
+  expect_equal(tracks$y, ref$y)
   expect_identical(tracks$time, ref$datetime)
   expect_false("heading" %in% names(tracks))
   expect_null(attr(tracks, "selection"))
